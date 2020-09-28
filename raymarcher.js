@@ -13,7 +13,7 @@ var sphereRadiuses = [
     0.17,
     ];
 
-var max_iter = 32.0;
+var max_iter = 4.0;
 var max_bound = 16;
 
 
@@ -38,7 +38,8 @@ const fsSource =
 	`#version 300 es
 	#define M_PI 3.1415926535897932384626433832795
 	#define NUM_SPHERE 16
-	#define MAX_ITER_MARCHING 5000
+	#define NUM_WALL 5
+	#define MAX_ITER_MARCHING 512
 
 	precision highp float;
 
@@ -53,13 +54,16 @@ const fsSource =
 	uniform float max_iter;
 	uniform int max_bound;
 
+	float exposure = 1.08;
+
 	in vec3 vTextureCoord;
 
 	out vec4 fragmentColor;
 
-	vec3 wallPosition[4];
-	vec3 wallDirection[4];
-	vec3 wallColor[4];
+	vec3 wallPosition[NUM_WALL];
+	vec3 wallDirection[NUM_WALL];
+	vec3 wallColor[NUM_WALL];
+	vec3 wallReflection[NUM_WALL];
 
 	float random(vec2 v) {
 		return fract(sin(dot(v, vec2(12.9898, 78.233))) * 43758.5453);
@@ -93,9 +97,14 @@ const fsSource =
 	//     sp: position of start edge of the cylinder
 	//     ep: position of end edge of the cylinder
 	//     ray: current position of the ray
-	float d_cylinder(vec3 sp, vec3 ep, vec3 pos_ray)
+	float d_cylinder(vec3 sp, vec3 ep, float r, vec3 pos_ray)
 	{
-		return min(length(sp - pos_ray), length(ep - pos_ray));
+		float l = length(ep - sp);
+		vec3 a = normalize(ep - sp);
+		float v = dot(a, pos_ray - sp);
+		float edge = min(length(sp - pos_ray), length(ep - pos_ray));
+
+		return min(v, edge);
 	}
 
 	// args:
@@ -124,7 +133,7 @@ const fsSource =
 			// wall hit
 			////
 			int hitWall = -1;
-			for (int n = 0; n < 4; n++) {
+			for (int n = 0; n < NUM_WALL; n++) {
 				d = d_plane(wallPosition[n], wallDirection[n], ray.pos);
 				d_min = min(d, d_min);
 				if (d < d_ep) {
@@ -146,11 +155,17 @@ const fsSource =
 
 				// Reflect
 				ray.dir = reflect(ray.dir, norm);
-				ray.pos += ray.dir * d_ep * 2.0;
+				ray.pos += ray.dir * d_ep * 10.0;
 
 				// Color
 				// ray.col += ray.reflection * vec3(0.0, 0.0, 0.0);
-				ray.reflection = ray.reflection * vec3(1.0, 0.7, 0.7);
+				//const vec3 reflection = vec3(1.0, 0.9, 0.9);
+				const vec3 reflection = vec3(1.0, 1.0, 1.0);
+				const float f0 = 0.8;
+				ray.reflection = ray.reflection * reflection * vec3(mix(
+				    f0 + (1.0 - f0) * pow(1.0 - dot(ray.dir, norm), 5.0),
+				    f0 * dot(ray.dir, norm),
+				    step(1.0, iter)));
 			} else if (hitWall >= 0) {
 				// Get normal vector
 				vec3 norm;
@@ -165,7 +180,12 @@ const fsSource =
 
 				// Color
 				ray.col += ray.reflection * wallColor[hitWall];
-				ray.reflection = ray.reflection * vec3(0.1, 0.1, 0.1);
+				const vec3 reflection = vec3(0.1, 0.1, 0.1);
+				const float f0 = 0.8;
+				ray.reflection = ray.reflection * wallReflection[hitWall] * vec3(mix(
+				    f0 + (1.0 - f0) * pow(1.0 - dot(ray.dir, norm), 5.0),
+				    f0 * dot(ray.dir, norm),
+				    step(1.0, iter)));
 			}
 		}
 		ray.col = clamp(ray.col, 0.0, 2.0);
@@ -177,32 +197,51 @@ const fsSource =
 		wallPosition[1] = vec3(1.0, 0.0, 0.0);
 		wallPosition[2] = vec3(0.0, -1.0, 0.0);
 		wallPosition[3] = vec3(0.0, 1.0, 0.0);
+		wallPosition[4] = vec3(0.0, 0.0, -2.0);
 		wallDirection[0] = vec3(1.0, 0.0, 0.0);
 		wallDirection[1] = vec3(-1.0, 0.0, 0.0);
 		wallDirection[2] = vec3(0.0, 1.0, 0.0);
 		wallDirection[3] = vec3(0.0, -1.0, 0.0);
-		wallColor[0] = vec3(0.8, 0.8, 1.0);
-		wallColor[1] = vec3(0.5, 1.0, 0.5);
+		wallDirection[4] = vec3(0.0, 0.0, 1.0);
+		wallColor[0] = vec3(0.5, 0.5, 0.8);
+		wallColor[1] = vec3(0.25, 0.5, 0.25);
 		wallColor[2] = vec3(0.1, 0.1, 0.1);
-		wallColor[3] = vec3(0.9, 0.9, 0.9);
+		wallColor[3] = vec3(0.5, 0.5, 0.5);
+		wallColor[4] = vec3(2.0, 2.0, 2.0);
+		wallReflection[0] = vec3(0.5, 0.5, 0.8);
+		wallReflection[1] = vec3(0.25, 0.5, 0.25);
+		wallReflection[2] = vec3(0.1, 0.1, 0.1);
+		wallReflection[3] = vec3(0.4, 0.4, 0.4);
+		wallReflection[4] = vec3(0.1, 0.1, 0.1);
 
 
 		vec3 color = vec3(0.0);
+		/*
 		const float diffuse = 0.8;
-		//for (float iter = 0.0; iter < max_iter; iter += 1.0) {
+		for (float iter = 0.0; iter < max_iter; iter += 1.0) {
 			TraceData ray;
 			ray.pos = cameraPosition;
 			ray.dir = normalize(vTextureCoord);
 			ray.col = vec3(0.0);
 			ray.reflection = vec3(1.0);
 			// Marching
-			const float iter = 0.0;
 			ray = traceRay(ray, iter);
 			// Get color
-			//color += ray.col * mix(1.0, mix(1.0 - diffuse, diffuse / (max_iter - 1.0), step(1.0, iter)), step(2.0, max_iter));
+			color += ray.col * mix(1.0, mix(1.0 - diffuse, diffuse / (max_iter - 1.0), step(1.0, iter)), step(2.0, max_iter));
+		}
+		*/
+		{
+			TraceData ray;
+			ray.pos = cameraPosition;
+			ray.dir = normalize(vTextureCoord);
+			ray.col = vec3(0.0);
+			ray.reflection = vec3(1.0);
+			// Marching
+			ray = traceRay(ray, 0.0);
+			// Get color
 			color = ray.col;
-		//}
-		fragmentColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+		}
+		fragmentColor = vec4(clamp(exposure * color, 0.0, 1.0), 1.0);
 	}
 `;
 
