@@ -3,14 +3,19 @@
 var cameraPosition = [ 0.0, 0.0, -1.0 ];
 var wallOffset = 0.8;
 var spherePositions = [
-    [ 0.8, 0.0, 2.9 ],
-    [ 0.0, -0.3, 2.9 ],
-    [ -0.3, 0.0, 2.3 ],
+    [ -0.8, 0.9, 2.9 ],
+    [ 0.3, -0.2, 2.0 ],
+    [ -0.6, -0.7, 1.2 ],
+    [ 0.0, 0.7, 0.4 ],
+    [ 0.9, -0.9, 0.14 ],
+    [ -0.6, 0.1, -0.5 ],
     ];
 var sphereRadiuses = [
     0.3,
-    0.4,
-    0.17,
+    0.2,
+    0.1,
+    0.05,
+    0.025,
     ];
 
 var max_iter = 4.0;
@@ -99,12 +104,20 @@ const fsSource =
 	//     ray: current position of the ray
 	float d_cylinder(vec3 sp, vec3 ep, float r, vec3 pos_ray)
 	{
-		float l = length(ep - sp);
+		vec3 mid = (sp + ep) * 0.5;
+		float lh = length(ep - mid);
 		vec3 a = normalize(ep - sp);
-		float v = dot(a, pos_ray - sp);
-		float edge = min(length(sp - pos_ray), length(ep - pos_ray));
+		float v = dot(a, pos_ray - mid);
+		vec3 n = normalize(pos_ray - mid - v * a);
+		float d = mix(
+			length(pos_ray - mid - v * a) - r,
+			//min(length(pos_ray - sp), length(pos_ray - ep)),
+			mix(max(dot(sp - pos_ray, a), dot(pos_ray - ep, a)),
+			    min(length(sp + n * r - pos_ray), length(pos_ray - ep - n * r)),
+			    step(r, dot(pos_ray - sp, n))),
+			step(lh, abs(v)));
 
-		return min(v, edge);
+		return d;
 	}
 
 	// args:
@@ -121,8 +134,17 @@ const fsSource =
 			////
 			int hitSphere = -1;
 			float d_min = 1000.0;
+			/*
 			for (int n = 0; n < numberOfSphere; n++) {
 				d = d_sphere(spherePosition[n], sphereRadius[n], ray.pos);
+				if (d < d_ep) {
+					hitSphere = n;
+				}
+				d_min = min(d, d_min);
+			}
+			*/
+			for (int n = 0; n < numberOfSphere - 1; n++) {
+				d = d_cylinder(spherePosition[n], spherePosition[n + 1], sphereRadius[n], ray.pos);
 				if (d < d_ep) {
 					hitSphere = n;
 				}
@@ -148,9 +170,17 @@ const fsSource =
 			if (hitSphere >= 0) {
 				// Get normal vector
 				vec3 norm;
+				/*
 				norm.x = d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos + vec3(1.0E-6, 0.0, 0.0)) - d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos - vec3(1.0E-6, 0.0, 0.0));
 				norm.y = d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos + vec3(0.0, 1.0E-6, 0.0)) - d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos - vec3(0.0, 1.0E-6, 0.0));
 				norm.z = d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos + vec3(0.0, 0.0, 1.0E-6)) - d_sphere(spherePosition[hitSphere], sphereRadius[hitSphere], ray.pos - vec3(0.0, 0.0, 1.0E-6));
+				*/
+				norm.x = d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos + vec3(1.0E-6, 0.0, 0.0)) -
+					d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos - vec3(1.0E-6, 0.0, 0.0));
+				norm.y = d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos + vec3(0.0, 1.0E-6, 0.0)) -
+					d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos - vec3(0.0, 1.0E-6, 0.0));
+				norm.z = d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos + vec3(0.0, 0.0, 1.0E-6)) -
+					d_cylinder(spherePosition[hitSphere], spherePosition[hitSphere + 1], sphereRadius[hitSphere], ray.pos - vec3(0.0, 0.0, 1.0E-6));
 				norm = normalize(norm);
 
 				// Reflect
@@ -346,10 +376,11 @@ function glmain() {
 	function render(now) {
 		cameraPosition[0] = Math.sin(2.0 * Math.PI * count / 300) * 0.1;
 		//spherePositions[0][0] = Math.cos(2.0 * Math.PI * count / 217) * 0.9;
-		spherePositions[0][1] = Math.sin(2.0 * Math.PI * count / 217) * 0.2;
+		/*spherePositions[0][1] = Math.sin(2.0 * Math.PI * count / 217) * 0.2;
 		sphereRadiuses[2] = 0.17 +
 		    0.025 * Math.pow(Math.sin(2.0 * Math.PI * count / 211), 512.0) +
 		    0.025 * Math.pow(Math.sin(2.0 * Math.PI * (count + 7) / 211), 512.0);
+		    */
 		++count;
 		drawScene(gl, renderProgramInfo, textures, screenBuffers);
 
@@ -505,7 +536,8 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 	    wallOffset);
 	gl.uniform1i(
 	    renderProgramInfo.uniformLocations.numberOfSphere,
-	    Math.min(spherePositions.length, sphereRadiuses.length));
+	    //Math.min(spherePositions.length, sphereRadiuses.length));
+	    spherePositions.length);
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.max_iter,
 	    max_iter);
