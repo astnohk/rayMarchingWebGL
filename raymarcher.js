@@ -44,7 +44,7 @@ const fsSource =
 	#define M_PI 3.1415926535897932384626433832795
 	#define NUM_SPHERE 16
 	#define NUM_WALL 5
-	#define MAX_ITER_MARCHING 256
+	#define MAX_ITER_MARCHING 128
 
 	precision highp float;
 
@@ -60,6 +60,7 @@ const fsSource =
 	uniform int max_bound;
 
 	float exposure = 1.08;
+	float no_fog = 0.9; // probability of rays not hit particle in the air
 
 	in vec3 vTextureCoord;
 
@@ -184,6 +185,10 @@ const fsSource =
 
 			// Forward ray
 			ray.pos += ray.dir * d_min;
+
+			// Add fog
+			//ray.col += vec3(0.01, 0.01, 0.02) * step(pow(no_fog, 1.0 + d_min * 10.0), abs(random(vec2(seed, ray.pos.z))));
+			ray.col += vec3(0.10, 0.10, 0.17) * ray.reflection * d_min * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
 
 			// Reflect
 			if (hitSphere >= 0) {
