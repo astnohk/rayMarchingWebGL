@@ -44,7 +44,7 @@ const fsSource =
 	#define M_PI 3.1415926535897932384626433832795
 	#define NUM_SPHERE 16
 	#define NUM_WALL 5
-	#define MAX_ITER_MARCHING 512
+	#define MAX_ITER_MARCHING 256
 
 	precision highp float;
 
@@ -80,6 +80,25 @@ const fsSource =
 		vec3 col;
 		vec3 reflection;
 	};
+
+	float d_intersection(float shape0, float shape1)
+	{
+		return max(shape0, shape1);
+	}
+
+	float d_union(float shape0, float shape1)
+	{
+		return min(shape0, shape1);
+	}
+
+	// Calculate shape0 - shape1
+	// args:
+	//     shape0: distance of the base shape
+	//     shape1: distance of the subtract shape
+	float d_diff(float shape0, float shape1)
+	{
+		return max(shape0, -shape1);
+	}
 
 	// args:
 	//     pos: position of center of the wall
