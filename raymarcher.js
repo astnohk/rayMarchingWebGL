@@ -409,10 +409,35 @@ const fsSource =
 
 
 
+
+////////////////////////////////////////////////////////////////
+//
+//        Initialize
+//
+////////////////////////////////////////////////////////////////
 window.onload = init;
 
 function init() {
 	// Initialize HTML
+	// Event
+	window.addEventListener(
+		"keydown",
+		(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (event.key === 'w') {
+				cameraPosition[2] += 0.05;
+			} else if(event.key === 'a') {
+				cameraPosition[0] -= 0.05;
+			} else if(event.key === 's') {
+				cameraPosition[2] -= 0.05;
+			} else if(event.key === 'd') {
+				cameraPosition[0] += 0.05;
+			}
+		});
+
+	// WebGL
 	// max iteration count
 	const max_iterInput = document.getElementById("maxIterationCount");
 	max_iterInput.value = max_iter;
@@ -436,6 +461,9 @@ function init() {
 	// Start WebGL
 	glmain();
 }
+
+
+
 
 function glmain() {
 	const canvas = document.querySelector('#glcanvas');
@@ -499,7 +527,7 @@ function glmain() {
 	let count = 0;
 	function render(now) {
 		// Move cmaera
-		cameraPosition[0] = Math.sin(2.0 * Math.PI * count / 300) * 0.1;
+		cameraPosition[1] = Math.sin(2.0 * Math.PI * count / 137) * 0.05;
 		// Rotate the torus
 		gl_shapes[gl_shapes.length - 1].vb = [
 			Math.sin(2.0 * Math.PI * count / 200),
