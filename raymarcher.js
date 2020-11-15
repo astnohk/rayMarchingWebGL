@@ -1,5 +1,6 @@
 "use strict";
 
+const NUM_SHAPE_MAX = 16;
 const SHAPE_TYPE_WALL = 0;
 const SHAPE_TYPE_SPHERE = 1;
 const SHAPE_TYPE_CYLINDER = 2;
@@ -457,6 +458,10 @@ function glmain() {
 	// Look up which attributes our shader program is using
 	// for aVertexPosition, aVevrtexColor and also
 	// look up uniform locations.
+	let tmpArr = new Array(NUM_SHAPE_MAX);
+	for (let i = 0; i < tmpArr.length; ++i) {
+		tmpArr[i] = i;
+	}
 	const renderProgramInfo = {
 		shaderProgram: renderShaderProgram,
 		attribLocations: {
@@ -469,7 +474,7 @@ function glmain() {
 			textureMatrix: gl.getUniformLocation(renderShaderProgram, 'textureMatrix'),
 			cameraPosition: gl.getUniformLocation(renderShaderProgram, 'cameraPosition'),
 			numberOfShapes: gl.getUniformLocation(renderShaderProgram, 'numberOfShapes'),
-			shapes: gl_shapes.map((x, ind) => {
+			shapes: tmpArr.map((x, ind) => {
 				return {
 					type: gl.getUniformLocation(renderShaderProgram, 'shape_type[' + ind + ']'),
 					va: gl.getUniformLocation(renderShaderProgram, 'shape_va[' + ind + ']'),
