@@ -302,7 +302,7 @@ const fsSource =
 			float d_min = 1000.0;
 			int hit = -1;
 
-			for (int k = 0; k < numberOfShapes; ++k) {
+			for (int k = 0; k < min(numberOfShapes, NUM_SHAPE_MAX); ++k) {
 				if (shape_type[k] == SHAPE_TYPE_WALL) {
 					////
 					// wall hit
