@@ -409,6 +409,14 @@ const fsSource =
 
 
 
+////////////////////////////////////////////////////////////////
+//
+//        GUI params
+//
+////////////////////////////////////////////////////////////////
+var touchPointCount_prev = 0;
+var touchDistance_prev = 0;
+var touchCenter_prev = { x: 0, y: 0 };
 
 ////////////////////////////////////////////////////////////////
 //
@@ -435,6 +443,70 @@ function init() {
 			} else if(event.key === 'd') {
 				cameraPosition[0] += 0.05;
 			}
+		});
+	const canvas = document.getElementById('glcanvas');
+	canvas.addEventListener(
+		"touchstart",
+		(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (e.touches.length >= 2) {
+				// Distance
+				let d = Math.sqrt(
+					Math.pow(e.touches[0].clientX - e.touches[1].clientX, 2) +
+					Math.pow(e.touches[0].clientY - e.touches[1].clientY, 2));
+				touchDistance_prev = d;
+
+				// Center
+				let x_c = (e.touches[0].clientX - e.touches[1].clientX) / 2.0;
+				let y_c = (e.touches[0].clientY - e.touches[1].clientY) / 2.0;
+				touchCenter_prev.x = x_c;
+				touchCenter_prev.y = y_c;
+			} else {
+				// Distance
+				touchDistance_prev = 0;
+
+				// Center
+				touchCenter_prev.x = e.touches[0].clientX;
+				touchCenter_prev.y = e.touches[0].clientY;
+			}
+			touchPointCount_prev = e.touches.length;
+		});
+	canvas.addEventListener(
+		"touchmove",
+		(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (e.touches.length >= 2) {
+				// Distance
+				let d = Math.sqrt(
+					Math.pow(e.touches[0].clientX - e.touches[1].clientX, 2) +
+					Math.pow(e.touches[0].clientY - e.touches[1].clientY, 2));
+				if (touchPointCount_prev) {
+					cameraPosition[2] += 0.05 * (d - touchDistance_prev);
+				}
+				touchDistance_prev = d;
+
+				// Center
+				let x_c = (e.touches[0].clientX - e.touches[1].clientX) / 2.0;
+				let y_c = (e.touches[0].clientY - e.touches[1].clientY) / 2.0;
+				if (touchPointCount_prev) {
+					cameraPosition[0] += 0.05 * (x_c - touchCenter_prev.x);
+					cameraPosition[1] += 0.05 * (y_c - touchCenter_prev.y);
+				}
+				touchCenter_prev.x = x_c;
+				touchCenter_prev.y = y_c;
+			} else {
+				// Distance
+				touchDistance_prev = 0;
+
+				// Center
+				touchCenter_prev.x = e.touches[0].clientX;
+				touchCenter_prev.y = e.touches[0].clientY;
+			}
+			touchPointCount_prev = e.touches.length;
 		});
 
 	// WebGL
@@ -466,7 +538,7 @@ function init() {
 
 
 function glmain() {
-	const canvas = document.querySelector('#glcanvas');
+	const canvas = document.getElementById('glcanvas');
 
 	// Get WebGL instance
 	const gl = canvas.getContext('webgl2', { antialias: true });
