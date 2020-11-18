@@ -1,12 +1,21 @@
 "use strict";
 
+const DIMENSION_NUM_3 = 3;
+const DIMENSION_NUM_3_X = 0;
+const DIMENSION_NUM_3_Y = 1;
+const DIMENSION_NUM_3_Z = 2;
+
 const NUM_SHAPE_MAX = 16;
 const SHAPE_TYPE_WALL = 0;
 const SHAPE_TYPE_SPHERE = 1;
 const SHAPE_TYPE_CYLINDER = 2;
 const SHAPE_TYPE_TORUS = 3;
 
+const KEYBOARD_CONTROL_COEFFICIENT = 0.01;
+const TOUCH_CONTROL_COEFFICIENT = 0.005;
+
 var cameraPosition = [ 0.0, 0.0, -1.0 ];
+var cameraVelocity = [ 0.0, 0.0, 0.0 ];
 var wallOffset = 1.1;
 
 var gl_shapes = [
@@ -435,13 +444,17 @@ function init() {
 			e.stopPropagation();
 
 			if (event.key === 'w') {
-				cameraPosition[2] += 0.05;
+				//cameraPosition[2] += KEYBOARD_CONTROL_COEFFICIENT;
+				cameraVelocity[2] += KEYBOARD_CONTROL_COEFFICIENT;
 			} else if(event.key === 'a') {
-				cameraPosition[0] -= 0.05;
+				//cameraPosition[0] -= KEYBOARD_CONTROL_COEFFICIENT;
+				cameraVelocity[0] -= KEYBOARD_CONTROL_COEFFICIENT;
 			} else if(event.key === 's') {
-				cameraPosition[2] -= 0.05;
+				//cameraPosition[2] -= KEYBOARD_CONTROL_COEFFICIENT;
+				cameraVelocity[2] -= KEYBOARD_CONTROL_COEFFICIENT;
 			} else if(event.key === 'd') {
-				cameraPosition[0] += 0.05;
+				//cameraPosition[0] += KEYBOARD_CONTROL_COEFFICIENT;
+				cameraVelocity[0] += KEYBOARD_CONTROL_COEFFICIENT;
 			}
 		});
 	const canvas = document.getElementById('glcanvas');
@@ -485,7 +498,7 @@ function init() {
 					Math.pow(e.touches[0].clientX - e.touches[1].clientX, 2) +
 					Math.pow(e.touches[0].clientY - e.touches[1].clientY, 2));
 				if (touchPointCount_prev) {
-					cameraPosition[2] += 0.05 * (d - touchDistance_prev);
+					cameraPosition[2] += TOUCH_CONTROL_COEFFICIENT * (d - touchDistance_prev);
 				}
 				touchDistance_prev = d;
 
@@ -493,8 +506,8 @@ function init() {
 				let x_c = (e.touches[0].clientX - e.touches[1].clientX) / 2.0;
 				let y_c = (e.touches[0].clientY - e.touches[1].clientY) / 2.0;
 				if (touchPointCount_prev) {
-					cameraPosition[0] += 0.05 * (x_c - touchCenter_prev.x);
-					cameraPosition[1] += 0.05 * (y_c - touchCenter_prev.y);
+					cameraPosition[0] += TOUCH_CONTROL_COEFFICIENT * (x_c - touchCenter_prev.x);
+					cameraPosition[1] += TOUCH_CONTROL_COEFFICIENT * (y_c - touchCenter_prev.y);
 				}
 				touchCenter_prev.x = x_c;
 				touchCenter_prev.y = y_c;
@@ -600,6 +613,17 @@ function glmain() {
 	function render(now) {
 		// Move cmaera
 		cameraPosition[1] = Math.sin(2.0 * Math.PI * count / 137) * 0.05;
+		for (let i = 0; i < DIMENSION_NUM_3; ++i) {
+			cameraPosition[i] += cameraVelocity[i];
+		}
+		if (Math.abs(cameraPosition[DIMENSION_NUM_3_X]) >= 1.0) {
+			cameraPosition[DIMENSION_NUM_3_X] = Math.sign(cameraPosition[DIMENSION_NUM_3_X]) * (1.0 - 1E-6);
+			cameraVelocity[DIMENSION_NUM_3_X] = 0.0; // Stop movement
+		}
+		if (Math.abs(cameraPosition[DIMENSION_NUM_3_Y]) >= 1.0) {
+			cameraPosition[DIMENSION_NUM_3_Y] = Math.sign(cameraPosition[DIMENSION_NUM_3_Y]) * (1.0 - 1E-6);
+			cameraVelocity[DIMENSION_NUM_3_Y] = 0.0; // Stop movement
+		}
 		// Rotate the torus
 		gl_shapes[gl_shapes.length - 1].vb = [
 			Math.sin(2.0 * Math.PI * count / 200),
