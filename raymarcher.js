@@ -14,6 +14,10 @@ const SHAPE_TYPE_TORUS = 3;
 const KEYBOARD_CONTROL_COEFFICIENT = 0.01;
 const TOUCH_CONTROL_COEFFICIENT = 0.005;
 
+// Set true if you want to get reflections on crystal surfaces
+// but it will doubles GPU processing load.
+var realistic_render = false;
+
 var cameraPosition = [ 0.0, 0.0, -1.0 ];
 var cameraVelocity = [ 0.0, 0.0, 0.0 ];
 var wallOffset = 1.1;
@@ -25,9 +29,10 @@ var gl_shapes = [
 	    vb: [ 0.0, 1.0, 0.0 ],
 	    fa: 0.0, // UNUSED
 	    fb: 0.0, // UNUSED
-	    col: [ 0.1, 0.1, 0.1 ],
+	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -38,6 +43,7 @@ var gl_shapes = [
 	    col: [ 0.5, 0.5, 0.5 ],
 	    ref: [ 0.4, 0.4, 0.4 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -48,6 +54,7 @@ var gl_shapes = [
 	    col: [ 0.5, 0.5, 0.8 ],
 	    ref: [ 0.5, 0.5, 0.8 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -58,6 +65,7 @@ var gl_shapes = [
 	    col: [ 0.25, 0.5, 0.25 ],
 	    ref: [ 0.25, 0.5, 0.25 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -68,6 +76,7 @@ var gl_shapes = [
 	    col: [ 2.0, 2.0, 2.0 ],
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
+	    cr: 0,
     },
 
     {
@@ -79,6 +88,7 @@ var gl_shapes = [
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_SPHERE,
@@ -89,16 +99,18 @@ var gl_shapes = [
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
+	    cr: 1,
     },
     {
 	    type: SHAPE_TYPE_SPHERE,
-	    va: [ 0.4, -0.3, 2.2 ],
+	    va: [ 0.4, -0.03, 2.2 ],
 	    vb: [ 0.0, 0.0, 0.0 ], // UNUSED
 	    fa: 0.18,
 	    fb: 0.0, // UNUSED
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
+	    cr: 1,
     },
 
     {
@@ -110,6 +122,7 @@ var gl_shapes = [
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_CYLINDER,
@@ -120,6 +133,7 @@ var gl_shapes = [
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
+	    cr: 0,
     },
     {
 	    type: SHAPE_TYPE_CYLINDER,
@@ -130,6 +144,7 @@ var gl_shapes = [
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
+	    cr: 0,
     },
 
     {
@@ -138,13 +153,12 @@ var gl_shapes = [
 	    vb: [ 0.4, 0.0, 0.4 ],
 	    fa: 0.3,
 	    fb: 0.1,
-	    col: [ 0.7, 0.1, 0.1 ],
-	    ref: [ 0.1, 0.1, 0.1 ],
+	    col: [ 0.15, 0.05, 0.05 ],
+	    ref: [ 0.3, 0.1, 0.1 ],
 	    f0: 0.8,
+	    cr: 1,
     },
 ];
-
-var max_iter = 4.0;
 
 
 //// Render view
@@ -169,7 +183,7 @@ const fsSource =
 	#define M_PI 3.1415926535897932384626433832795
 	#define RAY_MARCHING_DISTANCE_EPSILON 1.0E-3
 	#define NUM_SHAPE_MAX 16
-	#define MAX_ITER_MARCHING 100
+	#define MAX_ITER_MARCHING 90
 
 	#define SHAPE_TYPE_WALL 0
 	#define SHAPE_TYPE_SPHERE 1
@@ -218,7 +232,8 @@ const fsSource =
 	uniform float shape_fb[NUM_SHAPE_MAX];
 	uniform vec3 shape_col[NUM_SHAPE_MAX];
 	uniform vec3 shape_ref[NUM_SHAPE_MAX];
-	uniform float shape_f0[NUM_SHAPE_MAX];
+	uniform float shape_f0[NUM_SHAPE_MAX]; // Fresnel reflection coefficient at perpendicular incident
+	uniform int shape_cr[NUM_SHAPE_MAX]; // crystal
 
 	float exposure = 1.08;
 	float no_fog = 0.9; // probability of rays not hit particle in the air
@@ -239,6 +254,11 @@ const fsSource =
 	float d_union(float shape0, float shape1)
 	{
 		return min(shape0, shape1);
+	}
+
+	float d_crystal(float shape)
+	{
+		return abs(shape);
 	}
 
 	// Calculate shape0 - shape1
@@ -335,6 +355,10 @@ const fsSource =
 					////
 					d = d_torus(shape_va[k], shape_vb[k], shape_fa[k], shape_fb[k], ray.pos);
 				}
+				if (shape_cr[k] != 0) {
+					d = d_crystal(d);
+				}
+
 				d_min = min(d, d_min);
 				if (d < d_ep) {
 					hit = k;
@@ -345,7 +369,7 @@ const fsSource =
 			ray.pos += ray.dir * d_min;
 
 			// Add fog
-			ray.col += vec3(0.10, 0.10, 0.17) * ray.reflection * d_min * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
+			ray.col += vec3(0.12, 0.12, 0.17) * ray.reflection * d_min * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
 
 			if (hit >= 0) {
 				// Reflect
@@ -382,16 +406,31 @@ const fsSource =
 					norm = normalize(norm);
 				}
 
-				// Reflect the ray
-				ray.dir = reflect(ray.dir, norm);
-				ray.pos += ray.dir * d_ep * 10.0;
-
 				// Color
 				ray.col += ray.reflection * shape_col[hit];
-				ray.reflection = ray.reflection * shape_ref[hit] * vec3(mix(
-				    shape_f0[hit] + (1.0 - shape_f0[hit]) * pow(1.0 - dot(ray.dir, norm), 5.0),
-				    shape_f0[hit] * dot(ray.dir, norm),
-				    step(1.0, iter)));
+
+				// Reflect the ray
+				if (iter > 0.0 || shape_cr[hit] == 0) {
+					ray.dir = reflect(ray.dir, norm);
+
+					// reflection
+					ray.reflection = ray.reflection * shape_ref[hit] * vec3(mix(
+					    shape_f0[hit] + (1.0 - shape_f0[hit]) * pow(1.0 - dot(ray.dir, norm), 5.0),
+					    shape_f0[hit] * dot(ray.dir, norm),
+					    step(2.0, iter)));
+				} else {
+					float mu = 0.1;
+					float n = dot(ray.dir, norm);
+					if (n < 0.0) {
+						ray.dir = normalize(ray.dir + mu * n * norm);
+					} else {
+						ray.dir = normalize(ray.dir - (1.0 - 1.0 / (1.0 + mu)) * n * norm);
+					}
+
+					// refraction
+					ray.reflection = 0.99 * ray.reflection;
+				}
+				ray.pos += ray.dir * d_ep * 10.0;
 			}
 		}
 		ray.col = clamp(ray.col, 0.0, 2.0);
@@ -401,6 +440,7 @@ const fsSource =
 	void main(void) {
 		vec3 color = vec3(0.0);
 
+		for (float iter = 0.0; iter < max_iter; iter += 1.0)
 		{
 			TraceData ray;
 			ray.pos = cameraPosition;
@@ -408,9 +448,9 @@ const fsSource =
 			ray.col = vec3(0.0);
 			ray.reflection = vec3(1.0);
 			// Marching
-			ray = traceRay(ray, 0.0);
+			ray = traceRay(ray, iter);
 			// Get color
-			color = ray.col;
+			color += ray.col / max_iter;
 		}
 
 		fragmentColor = vec4(clamp(exposure * color, 0.0, 1.0), 1.0);
@@ -523,26 +563,20 @@ function init() {
 			touchPointCount_prev = e.touches.length;
 		});
 
-	// WebGL
-	// max iteration count
-	const max_iterInput = document.getElementById("maxIterationCount");
-	max_iterInput.value = max_iter;
-	max_iterInput.addEventListener(
-	    "change",
-	    function () {
-		    max_iter = parseFloat(max_iterInput.value);
-		    if (max_iter < 1.0) {
-			    max_iter = 1.0;
-		    }
-	    });
-	const max_iterInputIncrement = document.getElementById("maxIterationCountInc");
-	const max_iterIncrementer = () => { max_iter = parseFloat(max_iterInput.value) + 1.0; max_iterInput.value = max_iter; };
-	max_iterInputIncrement.addEventListener("mousedown", max_iterIncrementer);
-	max_iterInputIncrement.addEventListener("touchstart", max_iterIncrementer);
-	const max_iterInputDecrement = document.getElementById("maxIterationCountDec");
-	const max_iterDecrementer = () => { max_iter = Math.max(parseFloat(max_iterInput.value) - 1.0, 1.0); max_iterInput.value = max_iter; };
-	max_iterInputDecrement.addEventListener("mousedown", max_iterDecrementer);
-	max_iterInputDecrement.addEventListener("touchstart", max_iterDecrementer);
+	// Switch
+	const realisticRenderSwitch = document.getElementById("realisticRenderSwitch");
+	realisticRenderSwitch.addEventListener(
+		"click",
+		(e) => {
+			realistic_render = !realistic_render;
+			if (realistic_render) {
+				realisticRenderSwitch.style.borderColor = "rgb(192,64,64)";
+				realisticRenderSwitch.style.backgroundColor = "rgb(24,0,0)";
+			} else {
+				realisticRenderSwitch.style.borderColor = "rgb(0,64,208)";
+				realisticRenderSwitch.style.backgroundColor = "rgb(0,0,24)";
+			}
+		});
 
 	// Start WebGL
 	glmain();
@@ -598,6 +632,7 @@ function glmain() {
 					col: gl.getUniformLocation(renderShaderProgram, 'shape_col[' + ind + ']'),
 					ref: gl.getUniformLocation(renderShaderProgram, 'shape_ref[' + ind + ']'),
 					f0: gl.getUniformLocation(renderShaderProgram, 'shape_f0[' + ind + ']'),
+					cr: gl.getUniformLocation(renderShaderProgram, 'shape_cr[' + ind + ']'),
 				};
 			}),
 			max_iter: gl.getUniformLocation(renderShaderProgram, 'max_iter'),
@@ -787,7 +822,7 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 	    gl_shapes.length);
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.max_iter,
-	    max_iter);
+	    realistic_render ? 2.0 : 1.0);
 	for (let i = 0; i < gl_shapes.length; ++i) {
 		gl.uniform1i(
 		    renderProgramInfo.uniformLocations.shapes[i].type,
@@ -813,6 +848,9 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 		gl.uniform1f(
 		    renderProgramInfo.uniformLocations.shapes[i].f0,
 		    gl_shapes[i].f0);
+		gl.uniform1i(
+		    renderProgramInfo.uniformLocations.shapes[i].cr,
+		    gl_shapes[i].cr);
 	}
 
 	enableAttribute(gl, renderProgramInfo.attribLocations, screenBuffers);
