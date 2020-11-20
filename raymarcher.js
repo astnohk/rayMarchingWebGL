@@ -167,8 +167,9 @@ const vsSource =
 const fsSource =
 	`#version 300 es
 	#define M_PI 3.1415926535897932384626433832795
+	#define RAY_MARCHING_DISTANCE_EPSILON 1.0E-3
 	#define NUM_SHAPE_MAX 16
-	#define MAX_ITER_MARCHING 150
+	#define MAX_ITER_MARCHING 100
 
 	#define SHAPE_TYPE_WALL 0
 	#define SHAPE_TYPE_SPHERE 1
@@ -305,7 +306,7 @@ const fsSource =
 	//     origin: start point of ray
 	//     ray: direction of ray (should be normalized)
 	TraceData traceRay(TraceData ray, const float iter) {
-		const float d_ep = 1.0E-6;
+		const float d_ep = RAY_MARCHING_DISTANCE_EPSILON;
 
 		for (int i = 0; i < MAX_ITER_MARCHING; ++i) {
 			float d; // temporary distance between current ray position and objects
