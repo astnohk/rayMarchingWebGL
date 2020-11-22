@@ -33,6 +33,7 @@ var gl_shapes = [
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -44,6 +45,7 @@ var gl_shapes = [
 	    ref: [ 0.4, 0.4, 0.4 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -55,6 +57,7 @@ var gl_shapes = [
 	    ref: [ 0.5, 0.5, 0.8 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -66,6 +69,7 @@ var gl_shapes = [
 	    ref: [ 0.25, 0.5, 0.25 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_WALL,
@@ -77,6 +81,7 @@ var gl_shapes = [
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
 
     {
@@ -89,6 +94,7 @@ var gl_shapes = [
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_SPHERE,
@@ -100,6 +106,7 @@ var gl_shapes = [
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
 	    cr: 1,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_SPHERE,
@@ -111,6 +118,7 @@ var gl_shapes = [
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
 	    cr: 1,
+	    mu: 1.2,
     },
 
     {
@@ -123,6 +131,7 @@ var gl_shapes = [
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_CYLINDER,
@@ -134,6 +143,7 @@ var gl_shapes = [
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
     {
 	    type: SHAPE_TYPE_CYLINDER,
@@ -145,6 +155,7 @@ var gl_shapes = [
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
 	    cr: 0,
+	    mu: 1.2,
     },
 
     {
@@ -157,6 +168,7 @@ var gl_shapes = [
 	    ref: [ 0.3, 0.1, 0.1 ],
 	    f0: 0.8,
 	    cr: 1,
+	    mu: 1.4,
     },
 ];
 
@@ -234,6 +246,7 @@ const fsSource =
 	uniform vec3 shape_ref[NUM_SHAPE_MAX];
 	uniform float shape_f0[NUM_SHAPE_MAX]; // Fresnel reflection coefficient at perpendicular incident
 	uniform int shape_cr[NUM_SHAPE_MAX]; // crystal
+	uniform float shape_mu[NUM_SHAPE_MAX]; // Refractive index
 
 	float exposure = 1.08;
 	float no_fog = 0.9; // probability of rays not hit particle in the air
@@ -419,12 +432,11 @@ const fsSource =
 					    shape_f0[hit] * dot(ray.dir, norm),
 					    step(2.0, iter)));
 				} else {
-					float mu = 0.1;
 					float n = dot(ray.dir, norm);
 					if (n < 0.0) {
-						ray.dir = normalize(ray.dir + mu * n * norm);
+						ray.dir = normalize(ray.dir + (shape_mu[hit] - 1.0) * n * norm);
 					} else {
-						ray.dir = normalize(ray.dir - (1.0 - 1.0 / (1.0 + mu)) * n * norm);
+						ray.dir = normalize(ray.dir - (1.0 - 1.0 / shape_mu[hit]) * n * norm);
 					}
 
 					// refraction
@@ -633,6 +645,7 @@ function glmain() {
 					ref: gl.getUniformLocation(renderShaderProgram, 'shape_ref[' + ind + ']'),
 					f0: gl.getUniformLocation(renderShaderProgram, 'shape_f0[' + ind + ']'),
 					cr: gl.getUniformLocation(renderShaderProgram, 'shape_cr[' + ind + ']'),
+					mu: gl.getUniformLocation(renderShaderProgram, 'shape_mu[' + ind + ']'),
 				};
 			}),
 			max_iter: gl.getUniformLocation(renderShaderProgram, 'max_iter'),
@@ -851,6 +864,9 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 		gl.uniform1i(
 		    renderProgramInfo.uniformLocations.shapes[i].cr,
 		    gl_shapes[i].cr);
+		gl.uniform1f(
+		    renderProgramInfo.uniformLocations.shapes[i].mu,
+		    gl_shapes[i].mu);
 	}
 
 	enableAttribute(gl, renderProgramInfo.attribLocations, screenBuffers);
