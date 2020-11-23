@@ -242,8 +242,6 @@ const fsSource =
 
 
 	uniform float seed;
-	uniform sampler2D texture;
-	uniform mat3 textureMatrix;
 	uniform vec3 cameraPosition;
 	uniform float max_iter;
 
@@ -257,8 +255,7 @@ const fsSource =
 	uniform vec3 shape_col[NUM_SHAPE_MAX];
 	uniform vec3 shape_ref[NUM_SHAPE_MAX];
 	uniform float shape_f0[NUM_SHAPE_MAX]; // Fresnel reflection coefficient at perpendicular incident
-	uniform int shape_cr[NUM_SHAPE_MAX]; // crystal
-	uniform float shape_mu[NUM_SHAPE_MAX]; // Refractive index
+	uniform float shape_cr[NUM_SHAPE_MAX]; // crystal
 
 	float exposure = 1.08;
 	float no_fog = 0.9; // probability of rays not hit particle in the air
@@ -421,7 +418,7 @@ const fsSource =
 					////
 					d = d_torus(shape_va[k], shape_vb[k], shape_fa[k], shape_fb[k], ray.pos);
 				}
-				if (shape_cr[k] != 0) {
+				if (shape_cr[k] != 0.0) {
 					d = d_crystal(d);
 				}
 
@@ -446,7 +443,7 @@ const fsSource =
 				ray.col += ray.reflection * shape_col[hit];
 
 				// Reflect the ray
-				if (iter > 0.0 || shape_cr[hit] == 0) {
+				if (iter > 0.0 || shape_cr[hit] == 0.0) {
 					ray.dir = reflect(ray.dir, norm);
 
 					// reflection
@@ -456,7 +453,7 @@ const fsSource =
 					    step(2.0, iter)));
 				} else {
 					float n = dot(ray.dir, norm);
-					ray.dir = normalize((ray.dir - n * norm) * pow(shape_mu[hit], -sign(n)) + n * norm);
+					ray.dir = normalize((ray.dir - n * norm) * pow(shape_cr[hit], -sign(n)) + n * norm);
 
 					// refraction
 					ray.reflection = 0.99 * ray.reflection;
@@ -872,7 +869,7 @@ function addPrimitiveController(obj, id)
 					obj.ref[i] = reflection.controls[i].value;
 				}
 				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? 1 : 0;
+				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
 	} else if (obj.type === SHAPE_TYPE_SPHERE) {
@@ -912,7 +909,7 @@ function addPrimitiveController(obj, id)
 				}
 				obj.fa = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? 1 : 0;
+				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
 	} else if (obj.type === SHAPE_TYPE_CYLINDER) {
@@ -959,7 +956,7 @@ function addPrimitiveController(obj, id)
 				}
 				obj.fa = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? 1 : 0;
+				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
 	} else if (obj.type === SHAPE_TYPE_TORUS) {
@@ -1011,7 +1008,7 @@ function addPrimitiveController(obj, id)
 				obj.fa = radius0.controls[0].value;
 				obj.fb = radius1.controls[0].value;
 				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? 1 : 0;
+				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
 	}
@@ -1204,8 +1201,6 @@ function glmain() {
 		},
 		uniformLocations: {
 			seed: gl.getUniformLocation(renderShaderProgram, 'seed'),
-			texture: gl.getUniformLocation(renderShaderProgram, 'texture'),
-			textureMatrix: gl.getUniformLocation(renderShaderProgram, 'textureMatrix'),
 			cameraPosition: gl.getUniformLocation(renderShaderProgram, 'cameraPosition'),
 			numberOfShapes: gl.getUniformLocation(renderShaderProgram, 'numberOfShapes'),
 			shapes: tmpArr.map((x, ind) => {
@@ -1219,7 +1214,6 @@ function glmain() {
 					ref: gl.getUniformLocation(renderShaderProgram, 'shape_ref[' + ind + ']'),
 					f0: gl.getUniformLocation(renderShaderProgram, 'shape_f0[' + ind + ']'),
 					cr: gl.getUniformLocation(renderShaderProgram, 'shape_cr[' + ind + ']'),
-					mu: gl.getUniformLocation(renderShaderProgram, 'shape_mu[' + ind + ']'),
 				};
 			}),
 			max_iter: gl.getUniformLocation(renderShaderProgram, 'max_iter'),
@@ -1229,7 +1223,6 @@ function glmain() {
 
 	const screen = createScreen();
 	const screenBuffers = createVBO(gl, screen);
-	const textures = createTexture(gl);
 
 	// Draw the scene repeatedly
 	let count = 0;
@@ -1250,7 +1243,7 @@ function glmain() {
 		}
 
 		++count;
-		drawScene(gl, renderProgramInfo, textures, screenBuffers);
+		drawScene(gl, renderProgramInfo, screenBuffers);
 
 		requestAnimationFrame(render);
 	}
@@ -1325,21 +1318,6 @@ function createVBO(gl, data) {
 	};
 }
 
-function createTexture(gl) {
-	//const img = document.getElementById("textureImage");
-
-	const tx = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_2D, tx);
-	//gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-	return [tx];
-}
-
 function initShaderProgram(gl, vsSource, fsSource) {
 	let vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
 	let fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -1368,7 +1346,7 @@ function loadShader(gl, type, source) {
 	return shader;
 }
 
-function drawScene(gl, renderProgramInfo, textures, screenBuffers)
+function drawScene(gl, renderProgramInfo, screenBuffers)
 {
 	////////////////////////////////////////////////////////////////
 	// Render
@@ -1379,23 +1357,9 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 	gl.clearDepth(1.0); // Clear everything
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DETPH_BUFFER_BIT);
 
-	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-
-	const textureMatrix = createIdenticalMat3();
-	textureMatrix[0] = 0.5; textureMatrix[4] = -0.5; // Scale
-	textureMatrix[6] = 0.5; textureMatrix[7] = 0.5; // Shift
-
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.seed,
 	    Math.random() * 10.0);
-	gl.uniform1i(
-	    renderProgramInfo.uniformLocations.texture,
-	    0);
-	gl.uniformMatrix3fv(
-	    renderProgramInfo.uniformLocations.textureMatrix,
-	    false,
-	    textureMatrix);
 	gl.uniform3fv(
 	    renderProgramInfo.uniformLocations.cameraPosition,
 	    cameraPosition);
@@ -1430,12 +1394,9 @@ function drawScene(gl, renderProgramInfo, textures, screenBuffers)
 		gl.uniform1f(
 		    renderProgramInfo.uniformLocations.shapes[i].f0,
 		    gl_shapes[i].f0);
-		gl.uniform1i(
+		gl.uniform1f(
 		    renderProgramInfo.uniformLocations.shapes[i].cr,
 		    gl_shapes[i].cr);
-		gl.uniform1f(
-		    renderProgramInfo.uniformLocations.shapes[i].mu,
-		    gl_shapes[i].mu);
 	}
 
 	enableAttribute(gl, renderProgramInfo.attribLocations, screenBuffers);
