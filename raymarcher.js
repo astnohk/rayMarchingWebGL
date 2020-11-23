@@ -1037,7 +1037,7 @@ function createControlPanelBoolSwitch(id, title_name, label_name, default_value 
 
 function createControlPanelInputText(id, title_name, default_value = "")
 {
-	const input_value_max_length = 8;
+	const input_value_max_length = 12;
 
 	const grid = document.createElement("div");
 	grid.className = "primitiveControlPanelGrid";
@@ -1074,7 +1074,7 @@ function createControlPanelInputText(id, title_name, default_value = "")
 
 function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, val_1, lab_2, val_2)
 {
-	const input_value_max_length = 6;
+	const input_value_max_length = 12;
 
 	const grid = document.createElement("div");
 	grid.className = "primitiveControlPanelGrid";
