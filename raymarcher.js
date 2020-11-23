@@ -10,6 +10,12 @@ const SHAPE_TYPE_WALL = 0;
 const SHAPE_TYPE_SPHERE = 1;
 const SHAPE_TYPE_CYLINDER = 2;
 const SHAPE_TYPE_TORUS = 3;
+const SHAPE_TYPE_NAME = [
+    "wall",
+    "sphere",
+    "cylinder",
+    "torus",
+];
 
 const KEYBOARD_CONTROL_COEFFICIENT = 0.01;
 const TOUCH_CONTROL_COEFFICIENT = 0.005;
@@ -22,8 +28,10 @@ var cameraPosition = [ 0.0, 0.0, -1.0 ];
 var cameraVelocity = [ 0.0, 0.0, 0.0 ];
 var wallOffset = 1.1;
 
-var gl_shapes = [
+var gl_shapes = [];
+const gl_shapes_init = [
     {
+	    name: "floor",
 	    type: SHAPE_TYPE_WALL,
 	    va: [ 0.0, -wallOffset, 0.0 ],
 	    vb: [ 0.0, 1.0, 0.0 ],
@@ -36,6 +44,7 @@ var gl_shapes = [
 	    mu: 1.2,
     },
     {
+	    name: "ceil",
 	    type: SHAPE_TYPE_WALL,
 	    va: [ 0.0, wallOffset, 0.0 ],
 	    vb: [ 0.0, -1.0, 0.0 ],
@@ -48,6 +57,7 @@ var gl_shapes = [
 	    mu: 1.2,
     },
     {
+	    name: "left_wall",
 	    type: SHAPE_TYPE_WALL,
 	    va: [ -wallOffset, 0.0, 0.0 ],
 	    vb: [ 1.0, 0.0, 0.0 ],
@@ -60,6 +70,7 @@ var gl_shapes = [
 	    mu: 1.2,
     },
     {
+	    name: "right_wall",
 	    type: SHAPE_TYPE_WALL,
 	    va: [ wallOffset, 0.0, 0.0 ],
 	    vb: [ -1.0, 0.0, 0.0 ],
@@ -72,6 +83,7 @@ var gl_shapes = [
 	    mu: 1.2,
     },
     {
+	    name: "back_light_wall",
 	    type: SHAPE_TYPE_WALL,
 	    va: [ 0.0, 0.0, -2.0 ],
 	    vb: [ 0.0, 0.0, 1.0 ],
@@ -194,7 +206,7 @@ const fsSource =
 	`#version 300 es
 	#define M_PI 3.1415926535897932384626433832795
 	#define RAY_MARCHING_DISTANCE_EPSILON 1.0E-3
-	#define NUM_SHAPE_MAX 16
+	#define NUM_SHAPE_MAX 32
 	#define MAX_ITER_MARCHING 90
 
 	#define SHAPE_TYPE_WALL 0
@@ -433,11 +445,7 @@ const fsSource =
 					    step(2.0, iter)));
 				} else {
 					float n = dot(ray.dir, norm);
-					if (n < 0.0) {
-						ray.dir = normalize(ray.dir + (shape_mu[hit] - 1.0) * n * norm);
-					} else {
-						ray.dir = normalize(ray.dir - (1.0 - 1.0 / shape_mu[hit]) * n * norm);
-					}
+					ray.dir = normalize((ray.dir - n * norm) * pow(shape_mu[hit], -sign(n)) + n * norm);
 
 					// refraction
 					ray.reflection = 0.99 * ray.reflection;
@@ -476,6 +484,9 @@ const fsSource =
 //        GUI params
 //
 ////////////////////////////////////////////////////////////////
+var mousePosition_prev = { x: 0, y: 0 };
+var mouseDownTarget = null;
+
 var touchPointCount_prev = 0;
 var touchDistance_prev = 0;
 var touchCenter_prev = { x: 0, y: 0 };
@@ -491,6 +502,33 @@ function init() {
 	// Initialize HTML
 	// Event
 	window.addEventListener(
+		"mousemove",
+		(e) => {
+			if (mouseDownTarget) {
+				if (mouseDownTarget.type === "text") {
+					let dy = e.clientY - mousePosition_prev.y;
+					let dv = 0.01 * Math.sign(-dy) * Math.exp(Math.abs(dy) / 10.0);
+					dv = dv < 0.5 ? dv > -0.5 ? dv : -0.5 : 0.5;
+					mouseDownTarget.value = parseFloat(mouseDownTarget.value) + dv;
+				}
+			}
+			mousePosition_prev.x = e.clientX;
+			mousePosition_prev.y = e.clientY;
+		});
+	window.addEventListener(
+		"mouseup",
+		(e) => {
+			// Create and Fire the change event
+			if (mouseDownTarget) {
+				const ev = new Event('change', { bubbles: true });
+				mouseDownTarget.dispatchEvent(ev);
+			}
+			// Cleare target
+			mouseDownTarget = null;
+		});
+
+	const canvas = document.getElementById('glcanvas');
+	canvas.addEventListener(
 		"keydown",
 		(e) => {
 			e.preventDefault();
@@ -510,7 +548,6 @@ function init() {
 				cameraVelocity[0] += KEYBOARD_CONTROL_COEFFICIENT;
 			}
 		});
-	const canvas = document.getElementById('glcanvas');
 	canvas.addEventListener(
 		"touchstart",
 		(e) => {
@@ -590,13 +627,511 @@ function init() {
 			}
 		});
 
+	// Initialize objects
+	for (let i = 0; i < gl_shapes_init.length; ++i) {
+		addObject(gl_shapes_init[i]);
+	}
+
 	// Start WebGL
 	glmain();
 }
 
 
 
+////////////////////////////////////////////////////////////////
+//
+//        HTML DOM controls
+//
+////////////////////////////////////////////////////////////////
 
+function addObject(obj)
+{
+	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
+	document.getElementById("tools").appendChild(controllPanel);
+
+	// Add object in the world
+	gl_shapes.push(obj);
+}
+
+function addWall(
+    pos = [ 0.0, 0.0, 0.0 ],
+    dir = [ 1.0, 0.0, 0.0 ],
+    col = [ 0.1, 0.1, 0.1 ],
+    ref = [ 0.1, 0.1, 0.1 ],
+    f0 = 0.8,
+    cr = 0,
+    mu = 1.2)
+{
+	const obj = {
+		type: SHAPE_TYPE_WALL,
+		va: pos,
+		vb: dir,
+		fa: 0.0, // UNUSED
+		fb: 0.0, // UNUSED
+		col: col,
+		ref: ref,
+		f0: f0,
+		cr: cr,
+		mu: mu,
+	};
+	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
+	document.getElementById("tools").appendChild(controllPanel);
+
+	// Add object in the world
+	gl_shapes.push(obj);
+}
+
+function addSphere(
+    pos = [ 0.0, 0.0, 0.0 ],
+    radius = 0.2,
+    col = [ 0.1, 0.1, 0.1 ],
+    ref = [ 0.1, 0.1, 0.1 ],
+    f0 = 0.8,
+    cr = 0,
+    mu = 1.2)
+{
+	const obj = {
+		type: SHAPE_TYPE_SPHERE,
+		va: pos,
+		vb: [ 0.0, 0.0, 0.0 ], // UNUSED
+		fa: radius,
+		fb: 0.0, // UNUSED
+		col: col,
+		ref: ref,
+		f0: f0,
+		cr: cr,
+		mu: mu,
+	};
+	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
+	document.getElementById("tools").appendChild(controllPanel);
+
+	// Add object in the world
+	gl_shapes.push(obj);
+}
+
+function addCylinder(
+    pos0 = [ 0.0, 0.0, 0.0 ],
+    pos1 = [ 0.0, 0.0, 0.0 ],
+    radius = 0.2,
+    col = [ 0.1, 0.1, 0.1 ],
+    ref = [ 0.1, 0.1, 0.1 ],
+    f0 = 0.8,
+    cr = 0,
+    mu = 1.2)
+{
+	const obj = {
+		type: SHAPE_TYPE_CYLINDER,
+		va: pos0,
+		vb: pos1,
+		fa: radius,
+		fb: 0.0, // UNUSED
+		col: col,
+		ref: ref,
+		f0: f0,
+		cr: cr,
+		mu: mu,
+	};
+	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
+	document.getElementById("tools").appendChild(controllPanel);
+
+	// Add object in the world
+	gl_shapes.push(obj);
+}
+
+function addTorus(
+    pos = [ 0.0, 0.0, 0.0 ],
+    dir = [ 0.0, 0.0, 0.0 ],
+    radius0 = 0.2,
+    radius1 = 0.2,
+    col = [ 0.1, 0.1, 0.1 ],
+    ref = [ 0.1, 0.1, 0.1 ],
+    f0 = 0.8,
+    cr = 0,
+    mu = 1.2)
+{
+	const obj = {
+		type: SHAPE_TYPE_TORUS,
+		va: pos,
+		vb: dir,
+		fa: radius0,
+		fb: radius1,
+		col: col,
+		ref: ref,
+		f0: f0,
+		cr: cr,
+		mu: mu,
+	};
+	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
+	document.getElementById("tools").appendChild(controllPanel);
+
+	// Add object in the world
+	gl_shapes.push(obj);
+}
+
+
+
+function addPrimitiveController(obj, id)
+{
+	const panel = document.createElement("div");
+	panel.className = "primitiveControlPanel";
+	panel.id = "primitiveController_" + SHAPE_TYPE_NAME[obj.type] + "_" + id;
+	
+	// Title
+	const title_bar = document.createElement("div");
+	title_bar.className = "primitiveControlPanelTitleBar";
+	panel.appendChild(title_bar);
+	const name = document.createElement("input");
+	name.type = "text";
+	name.className = "primitiveControlPanelName";
+	name.value = "" + SHAPE_TYPE_NAME[obj.type] + "_" + id;
+	if ("name" in obj) {
+		name.value = obj.name;
+	}
+	title_bar.appendChild(name);
+	const pulldown = document.createElement("div");
+	pulldown.className = "primitiveControlPanelPulldown";
+	pulldown.innerHTML = "V";
+	pulldown.pulldownState = false;
+	title_bar.appendChild(pulldown);
+
+	// Switches
+	if (obj.type === SHAPE_TYPE_WALL) {
+		const position = createControlPanelVector3Control(
+		    panel.id, "position",
+		    "pos_X", obj.va[0],
+		    "pos_Y", obj.va[1],
+		    "pos_Z", obj.va[2]);
+		panel.appendChild(position);
+		const direction = createControlPanelVector3Control(
+		    panel.id, "direction",
+		    "dir_X", obj.vb[0],
+		    "dir_Y", obj.vb[1],
+		    "dir_Z", obj.vb[2]);
+		panel.appendChild(direction);
+		const color = createControlPanelVector3Control(
+		    panel.id, "light_emission",
+		    "red", obj.col[0],
+		    "green", obj.col[1],
+		    "blue", obj.col[2]);
+		panel.appendChild(color);
+		const reflection = createControlPanelVector3Control(
+		    panel.id, "reflection",
+		    "red", obj.ref[0],
+		    "green", obj.ref[1],
+		    "blue", obj.ref[2]);
+		panel.appendChild(reflection);
+		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		panel.appendChild(f0);
+		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		panel.appendChild(crystal);
+
+		panel.addEventListener("change",
+			(e) => {
+				for (let i = 0; i < 3; ++i) {
+					obj.va[i] = position.controls[i].value;
+					obj.vb[i] = direction.controls[i].value;
+					obj.col[i] = color.controls[i].value;
+					obj.ref[i] = reflection.controls[i].value;
+				}
+				obj.f0 = f0.controls[0].value;
+				obj.cr = crystal.controls[0].checked ? 1 : 0;
+			});
+
+	} else if (obj.type === SHAPE_TYPE_SPHERE) {
+		const position = createControlPanelVector3Control(
+		    panel.id, "position",
+		    "pos_X", obj.va[0],
+		    "pos_Y", obj.va[1],
+		    "pos_Z", obj.va[2]);
+		panel.appendChild(position);
+		const radius = createControlPanelInputText(
+		    panel.id, "radius",
+		    "radius", obj.fa);
+		panel.appendChild(radius);
+		const color = createControlPanelVector3Control(
+		    panel.id, "light_emission",
+		    "red", obj.col[0],
+		    "green", obj.col[1],
+		    "blue", obj.col[2]);
+		panel.appendChild(color);
+		const reflection = createControlPanelVector3Control(
+		    panel.id, "reflection",
+		    "red", obj.ref[0],
+		    "green", obj.ref[1],
+		    "blue", obj.ref[2]);
+		panel.appendChild(reflection);
+		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		panel.appendChild(f0);
+		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		panel.appendChild(crystal);
+
+		panel.addEventListener("change",
+			(e) => {
+				for (let i = 0; i < 3; ++i) {
+					obj.va[i] = position.controls[i].value;
+					obj.col[i] = color.controls[i].value;
+					obj.ref[i] = reflection.controls[i].value;
+				}
+				obj.fa = radius.controls[i].value;
+				obj.f0 = f0.controls[0].value;
+				obj.cr = crystal.controls[0].checked ? 1 : 0;
+			});
+
+	} else if (obj.type === SHAPE_TYPE_CYLINDER) {
+		const position0 = createControlPanelVector3Control(
+		    panel.id, "position_start",
+		    "pos_X", obj.va[0],
+		    "pos_Y", obj.va[1],
+		    "pos_Z", obj.va[2]);
+		panel.appendChild(position0);
+		const position1 = createControlPanelVector3Control(
+		    panel.id, "position_end",
+		    "pos_X", obj.va[0],
+		    "pos_Y", obj.va[1],
+		    "pos_Z", obj.va[2]);
+		panel.appendChild(position1);
+		const radius = createControlPanelInputText(
+		    panel.id, "radius",
+		    "radius", obj.fa);
+		panel.appendChild(radius);
+		const color = createControlPanelVector3Control(
+		    panel.id, "light_emission",
+		    "red", obj.col[0],
+		    "green", obj.col[1],
+		    "blue", obj.col[2]);
+		panel.appendChild(color);
+		const reflection = createControlPanelVector3Control(
+		    panel.id, "reflection",
+		    "red", obj.ref[0],
+		    "green", obj.ref[1],
+		    "blue", obj.ref[2]);
+		panel.appendChild(reflection);
+		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		panel.appendChild(f0);
+		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		panel.appendChild(crystal);
+
+		panel.addEventListener("change",
+			(e) => {
+				for (let i = 0; i < 3; ++i) {
+					obj.va[i] = position0.controls[i].value;
+					obj.vb[i] = position1.controls[i].value;
+					obj.col[i] = color.controls[i].value;
+					obj.ref[i] = reflection.controls[i].value;
+				}
+				obj.fa = radius.controls[i].value;
+				obj.f0 = f0.controls[0].value;
+				obj.cr = crystal.controls[0].checked ? 1 : 0;
+			});
+
+	} else if (obj.type === SHAPE_TYPE_TORUS) {
+		const position = createControlPanelVector3Control(
+		    panel.id, "position",
+		    "pos_X", obj.va[0],
+		    "pos_Y", obj.va[1],
+		    "pos_Z", obj.va[2]);
+		panel.appendChild(position);
+		const direction = createControlPanelVector3Control(
+		    panel.id, "direction",
+		    "dir_X", obj.va[0],
+		    "dir_Y", obj.va[1],
+		    "dir_Z", obj.va[2]);
+		panel.appendChild(direction);
+		const radius0= createControlPanelInputText(
+		    panel.id, "radius0",
+		    "radius", obj.fa);
+		panel.appendChild(radius0);
+		const radius1 = createControlPanelInputText(
+		    panel.id, "radius1",
+		    "radius", obj.fa);
+		panel.appendChild(radius1);
+		const color = createControlPanelVector3Control(
+		    panel.id, "light_emission",
+		    "red", obj.col[0],
+		    "green", obj.col[1],
+		    "blue", obj.col[2]);
+		panel.appendChild(color);
+		const reflection = createControlPanelVector3Control(
+		    panel.id, "reflection",
+		    "red", obj.ref[0],
+		    "green", obj.ref[1],
+		    "blue", obj.ref[2]);
+		panel.appendChild(reflection);
+		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		panel.appendChild(f0);
+		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		panel.appendChild(crystal);
+
+		panel.addEventListener("change",
+			(e) => {
+				for (let i = 0; i < 3; ++i) {
+					obj.va[i] = position.controls[i].value;
+					obj.vb[i] = direction.controls[i].value;
+					obj.col[i] = color.controls[i].value;
+					obj.ref[i] = reflection.controls[i].value;
+				}
+				obj.fa = radius0.controls[i].value;
+				obj.fb = radius1.controls[i].value;
+				obj.f0 = f0.controls[0].value;
+				obj.cr = crystal.controls[0].checked ? 1 : 0;
+			});
+
+	}
+
+	pulldown.addEventListener("click",
+		(e) => {
+			pulldown.pulldownState = !pulldown.pulldownState;
+			if (pulldown.pulldownState) {
+				panel.style.height = panel.scrollHeight + "px";
+				pulldown.innerHTML = "A";
+			} else {
+				panel.style.height = "40px";
+				pulldown.innerHTML = "V";
+			}
+		});
+
+	return panel;
+}
+
+function createControlPanelBoolSwitch(id, title_name, label_name, default_value = false)
+{
+	const grid = document.createElement("div");
+	grid.className = "primitiveControlPanelGrid";
+	// title
+	const title_label = document.createElement("div");
+	title_label.className = "primitiveControlPanelControlTitle";
+	title_label.innerText = title_name;
+	grid.appendChild(title_label);
+	// switch
+	const input = document.createElement("input");
+	input.type = "checkbox";
+	input.id = "" + id + "_" + title_name + "_" + label_name;
+	input.className = "primitiveControlPanelBoolSwitch";
+	input.checked = default_value;
+	grid.appendChild(input);
+	const label = document.createElement("label");
+	label.className = "primitiveControlPanelBoolSwitch";
+	label.innerText = label_name;
+	label.htmlFor = input.id;
+	grid.appendChild(label);
+	
+	grid.controls = [ input ];
+	for (let i = 0; i < grid.controls.length; ++i) {
+		grid.controls[i].addEventListener("mousedown",
+			(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				mouseDownTarget = grid.controls[i];
+				mousePosition_prev.x = e.clientX;
+				mousePosition_prev.y = e.clientY;
+			});
+	}
+
+	return grid;
+}
+
+function createControlPanelInputText(id, title_name, default_value = "")
+{
+	const grid = document.createElement("div");
+	grid.className = "primitiveControlPanelGrid";
+	// title
+	const title_label = document.createElement("div");
+	title_label.className = "primitiveControlPanelControlTitle";
+	title_label.innerText = title_name;
+	grid.appendChild(title_label);
+	// input
+	const input = document.createElement("input");
+	input.id = "" + id + "_" + title_name;
+	input.type = "text";
+	input.className = "primitiveControlPanelInputText";
+	input.value = default_value;
+	grid.appendChild(input);
+
+	grid.controls = [ input ];
+	for (let i = 0; i < grid.controls.length; ++i) {
+		grid.controls[i].addEventListener("mousedown",
+			(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				mouseDownTarget = grid.controls[i];
+				mousePosition_prev.x = e.clientX;
+				mousePosition_prev.y = e.clientY;
+			});
+	}
+
+	return grid;
+}
+
+function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, val_1, lab_2, val_2)
+{
+	const grid = document.createElement("div");
+	grid.className = "primitiveControlPanelGrid";
+	// Title
+	const title_label = document.createElement("div");
+	title_label.className = "primitiveControlPanelControlTitle";
+	title_label.innerText = title_name;
+	grid.appendChild(title_label);
+	// X
+	const label_0 = document.createElement("label");
+	label_0.className = "primitiveControlPanelInputTextLabel";
+	label_0.innerText = lab_0;
+	grid.appendChild(label_0);
+	const value_0 = document.createElement("input");
+	value_0.id = "" + id + "_" + title_name + "_" + lab_0;
+	value_0.type = "text";
+	value_0.className = "primitiveControlPanelInputText";
+	value_0.value = val_0;
+	grid.appendChild(value_0);
+	// Y
+	const label_1 = document.createElement("label");
+	label_1.className = "primitiveControlPanelInputTextLabel";
+	label_1.innerText = lab_1;
+	grid.appendChild(label_1);
+	const value_1 = document.createElement("input");
+	value_1.id = "" + id + "_" + title_name + "_" + lab_1;
+	value_1.type = "text";
+	value_1.className = "primitiveControlPanelInputText";
+	value_1.value = val_1;
+	grid.appendChild(value_1);
+	// Z
+	const label_2 = document.createElement("label");
+	label_2.className = "primitiveControlPanelInputTextLabel";
+	label_2.innerText = lab_2;
+	grid.appendChild(label_2);
+	const value_2= document.createElement("input");
+	value_2.id = "" + id + "_" + title_name + "_" + lab_2;
+	value_2.type = "text";
+	value_2.className = "primitiveControlPanelInputText";
+	value_2.value = val_2;
+	grid.appendChild(value_2);
+
+	grid.controls = [
+	    value_0,
+	    value_1,
+	    value_2,
+	];
+	for (let i = 0; i < grid.controls.length; ++i) {
+		grid.controls[i].addEventListener("mousedown",
+			(e) => {
+				e.stopPropagation();
+				mouseDownTarget = grid.controls[i];
+				mouseDownTarget.focus();
+				mousePosition_prev.x = e.clientX;
+				mousePosition_prev.y = e.clientY;
+			});
+	}
+
+	return grid;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////
+//
+//        WebGL
+//
+////////////////////////////////////////////////////////////////
 function glmain() {
 	const canvas = document.getElementById('glcanvas');
 
@@ -665,6 +1200,7 @@ function glmain() {
 		for (let i = 0; i < DIMENSION_NUM_3; ++i) {
 			cameraPosition[i] += cameraVelocity[i];
 		}
+		// Limit the camera position inside X-Y walls
 		if (Math.abs(cameraPosition[DIMENSION_NUM_3_X]) >= 1.0) {
 			cameraPosition[DIMENSION_NUM_3_X] = Math.sign(cameraPosition[DIMENSION_NUM_3_X]) * (1.0 - 1E-6);
 			cameraVelocity[DIMENSION_NUM_3_X] = 0.0; // Stop movement
@@ -673,12 +1209,6 @@ function glmain() {
 			cameraPosition[DIMENSION_NUM_3_Y] = Math.sign(cameraPosition[DIMENSION_NUM_3_Y]) * (1.0 - 1E-6);
 			cameraVelocity[DIMENSION_NUM_3_Y] = 0.0; // Stop movement
 		}
-		// Rotate the torus
-		gl_shapes[gl_shapes.length - 1].vb = [
-			Math.sin(2.0 * Math.PI * count / 200),
-			0.0,
-			Math.cos(2.0 * Math.PI * count / 200),
-			];
 
 		++count;
 		drawScene(gl, renderProgramInfo, textures, screenBuffers);
