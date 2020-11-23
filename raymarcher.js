@@ -348,6 +348,47 @@ const fsSource =
 	}
 
 	// args:
+	//     hit: the index of shape which the ray hits
+	vec3 getNormVec(TraceData ray, int hit)
+	{
+		vec3 norm;
+
+		if (shape_type[hit] == SHAPE_TYPE_WALL) {
+			// Get normal vector
+			norm.x = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dx) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dx);
+			norm.y = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dy) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dy);
+			norm.z = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dz) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dz);
+
+			norm = normalize(norm);
+
+		} else if (shape_type[hit] == SHAPE_TYPE_SPHERE) {
+			// Get normal vector
+			norm.x = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dx) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dx);
+			norm.y = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dy) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dy);
+			norm.z = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dz) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dz);
+
+			norm = normalize(norm);
+
+		} else if (shape_type[hit] == SHAPE_TYPE_CYLINDER) {
+			// Get normal vector
+			norm.x = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dx) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dx);
+			norm.y = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dy) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dy);
+			norm.z = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dz) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dz);
+
+			norm = normalize(norm);
+
+		} else if (shape_type[hit] == SHAPE_TYPE_TORUS) {
+			norm.x = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dx) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dx);
+			norm.y = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dy) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dy);
+			norm.z = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dz) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dz);
+
+			norm = normalize(norm);
+		}
+
+		return norm;
+	}
+
+	// args:
 	//     origin: start point of ray
 	//     ray: direction of ray (should be normalized)
 	TraceData traceRay(TraceData ray, const float iter) {
@@ -394,42 +435,12 @@ const fsSource =
 			ray.pos += ray.dir * d_min;
 
 			// Add fog
-			ray.col += vec3(0.12, 0.12, 0.17) * ray.reflection * d_min * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
+			ray.col += vec3(0.10, 0.10, 0.17) * ray.reflection * log(1.0 + d_min) * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
+			ray.reflection *= exp(-0.1 * d_min); // attenuation
 
 			if (hit >= 0) {
 				// Reflect
-				vec3 norm;
-				if (shape_type[hit] == SHAPE_TYPE_WALL) {
-					// Get normal vector
-					norm.x = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dx) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dx);
-					norm.y = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dy) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dy);
-					norm.z = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dz) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dz);
-
-					norm = normalize(norm);
-
-				} else if (shape_type[hit] == SHAPE_TYPE_SPHERE) {
-					// Get normal vector
-					norm.x = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dx) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dx);
-					norm.y = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dy) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dy);
-					norm.z = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dz) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dz);
-
-					norm = normalize(norm);
-
-				} else if (shape_type[hit] == SHAPE_TYPE_CYLINDER) {
-					// Get normal vector
-					norm.x = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dx) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dx);
-					norm.y = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dy) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dy);
-					norm.z = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dz) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dz);
-
-					norm = normalize(norm);
-
-				} else if (shape_type[hit] == SHAPE_TYPE_TORUS) {
-					norm.x = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dx) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dx);
-					norm.y = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dy) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dy);
-					norm.z = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dz) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dz);
-
-					norm = normalize(norm);
-				}
+				vec3 norm = getNormVec(ray, hit);
 
 				// Color
 				ray.col += ray.reflection * shape_col[hit];
@@ -660,7 +671,7 @@ function addObject(obj)
 
 function addWall(
     pos = [ 0.0, 0.0, 0.0 ],
-    dir = [ 1.0, 0.0, 0.0 ],
+    dir = [ 0.0, 0.0, -1.0 ],
     col = [ 0.1, 0.1, 0.1 ],
     ref = [ 0.1, 0.1, 0.1 ],
     f0 = 0.8,
@@ -688,7 +699,7 @@ function addWall(
 
 function addSphere(
     pos = [ 0.0, 0.0, 0.0 ],
-    radius = 0.2,
+    radius = 0.1,
     col = [ 0.1, 0.1, 0.1 ],
     ref = [ 0.1, 0.1, 0.1 ],
     f0 = 0.8,
@@ -715,9 +726,9 @@ function addSphere(
 }
 
 function addCylinder(
-    pos0 = [ 0.0, 0.0, 0.0 ],
-    pos1 = [ 0.0, 0.0, 0.0 ],
-    radius = 0.2,
+    pos0 = [ -0.1, 0.0, 0.0 ],
+    pos1 = [ 0.1, 0.0, 0.0 ],
+    radius = 0.1,
     col = [ 0.1, 0.1, 0.1 ],
     ref = [ 0.1, 0.1, 0.1 ],
     f0 = 0.8,
@@ -745,9 +756,9 @@ function addCylinder(
 
 function addTorus(
     pos = [ 0.0, 0.0, 0.0 ],
-    dir = [ 0.0, 0.0, 0.0 ],
+    dir = [ 0.0, 0.0, 1.0 ],
     radius0 = 0.2,
-    radius1 = 0.2,
+    radius1 = 0.1,
     col = [ 0.1, 0.1, 0.1 ],
     ref = [ 0.1, 0.1, 0.1 ],
     f0 = 0.8,
@@ -798,6 +809,28 @@ function addPrimitiveController(obj, id)
 	pulldown.innerHTML = "V";
 	pulldown.pulldownState = false;
 	title_bar.appendChild(pulldown);
+	const deleteButton = document.createElement("div");
+	deleteButton.className = "primitiveControlPanelDeleteButton";
+	deleteButton.innerHTML = "X";
+	title_bar.appendChild(deleteButton);
+
+	pulldown.addEventListener("click",
+		(e) => {
+			pulldown.pulldownState = !pulldown.pulldownState;
+			if (pulldown.pulldownState) {
+				panel.style.height = panel.scrollHeight + "px";
+				pulldown.style.transform = "rotate(0.5turn)";
+			} else {
+				panel.style.height = "40px";
+				pulldown.style.transform = "rotate(0.0turn)";
+			}
+		});
+
+	deleteButton.addEventListener("click",
+		(e) => {
+			panel.remove();
+			gl_shapes.splice(gl_shapes.indexOf(obj), 1);
+		});
 
 	// Switches
 	if (obj.type === SHAPE_TYPE_WALL) {
@@ -938,9 +971,9 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(position);
 		const direction = createControlPanelVector3Control(
 		    panel.id, "direction",
-		    "dir_X", obj.va[0],
-		    "dir_Y", obj.va[1],
-		    "dir_Z", obj.va[2]);
+		    "dir_X", obj.vb[0],
+		    "dir_Y", obj.vb[1],
+		    "dir_Z", obj.vb[2]);
 		panel.appendChild(direction);
 		const radius0= createControlPanelInputText(
 		    panel.id, "radius0",
@@ -948,7 +981,7 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(radius0);
 		const radius1 = createControlPanelInputText(
 		    panel.id, "radius1",
-		    obj.fa);
+		    obj.fb);
 		panel.appendChild(radius1);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -982,18 +1015,6 @@ function addPrimitiveController(obj, id)
 			});
 
 	}
-
-	pulldown.addEventListener("click",
-		(e) => {
-			pulldown.pulldownState = !pulldown.pulldownState;
-			if (pulldown.pulldownState) {
-				panel.style.height = panel.scrollHeight + "px";
-				pulldown.innerHTML = "A";
-			} else {
-				panel.style.height = "40px";
-				pulldown.innerHTML = "V";
-			}
-		});
 
 	return panel;
 }
