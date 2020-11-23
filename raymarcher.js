@@ -506,11 +506,16 @@ function init() {
 		(e) => {
 			if (mouseDownTarget) {
 				if (mouseDownTarget.type === "text") {
+					const input_value_max_length = 12;
 					let dy = e.clientY - mousePosition_prev.y;
 					let dv = 0.01 * Math.sign(-dy) * Math.exp(Math.abs(dy) / 10.0);
 					dv = dv < 0.5 ? dv > -0.5 ? dv : -0.5 : 0.5;
 					mouseDownTarget.value = parseFloat(mouseDownTarget.value) + dv;
+					mouseDownTarget.value = mouseDownTarget.value.substring(0, input_value_max_length);
 				}
+				// Fire the 'change' event
+				const ev = new Event('change', { bubbles: true });
+				mouseDownTarget.dispatchEvent(ev);
 			}
 			mousePosition_prev.x = e.clientX;
 			mousePosition_prev.y = e.clientY;
@@ -846,7 +851,7 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(position);
 		const radius = createControlPanelInputText(
 		    panel.id, "radius",
-		    "radius", obj.fa);
+		    obj.fa);
 		panel.appendChild(radius);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -872,7 +877,7 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius.controls[i].value;
+				obj.fa = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? 1 : 0;
 			});
@@ -886,13 +891,13 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(position0);
 		const position1 = createControlPanelVector3Control(
 		    panel.id, "position_end",
-		    "pos_X", obj.va[0],
-		    "pos_Y", obj.va[1],
-		    "pos_Z", obj.va[2]);
+		    "pos_X", obj.vb[0],
+		    "pos_Y", obj.vb[1],
+		    "pos_Z", obj.vb[2]);
 		panel.appendChild(position1);
 		const radius = createControlPanelInputText(
 		    panel.id, "radius",
-		    "radius", obj.fa);
+		    obj.fa);
 		panel.appendChild(radius);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -919,7 +924,7 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius.controls[i].value;
+				obj.fa = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? 1 : 0;
 			});
@@ -939,11 +944,11 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(direction);
 		const radius0= createControlPanelInputText(
 		    panel.id, "radius0",
-		    "radius", obj.fa);
+		    obj.fa);
 		panel.appendChild(radius0);
 		const radius1 = createControlPanelInputText(
 		    panel.id, "radius1",
-		    "radius", obj.fa);
+		    obj.fa);
 		panel.appendChild(radius1);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -970,8 +975,8 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius0.controls[i].value;
-				obj.fb = radius1.controls[i].value;
+				obj.fa = radius0.controls[0].value;
+				obj.fb = radius1.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? 1 : 0;
 			});
@@ -1032,6 +1037,8 @@ function createControlPanelBoolSwitch(id, title_name, label_name, default_value 
 
 function createControlPanelInputText(id, title_name, default_value = "")
 {
+	const input_value_max_length = 8;
+
 	const grid = document.createElement("div");
 	grid.className = "primitiveControlPanelGrid";
 	// title
@@ -1044,6 +1051,8 @@ function createControlPanelInputText(id, title_name, default_value = "")
 	input.id = "" + id + "_" + title_name;
 	input.type = "text";
 	input.className = "primitiveControlPanelInputText";
+	input.maxLength = input_value_max_length;
+	input.size = input_value_max_length;
 	input.value = default_value;
 	grid.appendChild(input);
 
@@ -1054,6 +1063,7 @@ function createControlPanelInputText(id, title_name, default_value = "")
 				e.preventDefault();
 				e.stopPropagation();
 				mouseDownTarget = grid.controls[i];
+				mouseDownTarget.focus();
 				mousePosition_prev.x = e.clientX;
 				mousePosition_prev.y = e.clientY;
 			});
@@ -1064,6 +1074,8 @@ function createControlPanelInputText(id, title_name, default_value = "")
 
 function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, val_1, lab_2, val_2)
 {
+	const input_value_max_length = 6;
+
 	const grid = document.createElement("div");
 	grid.className = "primitiveControlPanelGrid";
 	// Title
@@ -1080,6 +1092,8 @@ function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, v
 	value_0.id = "" + id + "_" + title_name + "_" + lab_0;
 	value_0.type = "text";
 	value_0.className = "primitiveControlPanelInputText";
+	value_0.maxLength = input_value_max_length;
+	value_0.size = input_value_max_length;
 	value_0.value = val_0;
 	grid.appendChild(value_0);
 	// Y
@@ -1091,6 +1105,8 @@ function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, v
 	value_1.id = "" + id + "_" + title_name + "_" + lab_1;
 	value_1.type = "text";
 	value_1.className = "primitiveControlPanelInputText";
+	value_1.maxLength = input_value_max_length;
+	value_1.size = input_value_max_length;
 	value_1.value = val_1;
 	grid.appendChild(value_1);
 	// Z
@@ -1102,6 +1118,8 @@ function createControlPanelVector3Control(id, title_name, lab_0, val_0, lab_1, v
 	value_2.id = "" + id + "_" + title_name + "_" + lab_2;
 	value_2.type = "text";
 	value_2.className = "primitiveControlPanelInputText";
+	value_2.maxLength = input_value_max_length;
+	value_2.size = input_value_max_length;
 	value_2.value = val_2;
 	grid.appendChild(value_2);
 
