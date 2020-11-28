@@ -6,6 +6,7 @@ const DIMENSION_NUM_3_Y = 1;
 const DIMENSION_NUM_3_Z = 2;
 
 const NUM_SHAPE_MAX = 16;
+const SHAPE_TYPE_NULL = -1;
 const SHAPE_TYPE_WALL = 0;
 const SHAPE_TYPE_SPHERE = 1;
 const SHAPE_TYPE_CYLINDER = 2;
@@ -16,6 +17,12 @@ const SHAPE_TYPE_NAME = [
     "cylinder",
     "torus",
 ];
+
+const SHAPE_OPERATION_NONE = 0;
+const SHAPE_OPERATION_ASSIGN = 1;
+const SHAPE_OPERATION_UNION = 2;
+const SHAPE_OPERATION_INTERSECTION = 3;
+const SHAPE_OPERATION_DIFF = 4;
 
 const KEYBOARD_CONTROL_COEFFICIENT = 0.01;
 const TOUCH_CONTROL_COEFFICIENT = 0.005;
@@ -32,11 +39,11 @@ var gl_shapes = [];
 const gl_shapes_init = [
     {
 	    name: "floor",
-	    type: SHAPE_TYPE_WALL,
-	    va: [ 0.0, -wallOffset, 0.0 ],
-	    vb: [ 0.0, 1.0, 0.0 ],
-	    fa: 0.0, // UNUSED
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ 0.0, -wallOffset, 0.0, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ 0.0, 1.0, 0.0 ]),
+	    fa: createVec4(), // UNUSED
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
@@ -45,11 +52,11 @@ const gl_shapes_init = [
     },
     {
 	    name: "ceil",
-	    type: SHAPE_TYPE_WALL,
-	    va: [ 0.0, wallOffset, 0.0 ],
-	    vb: [ 0.0, -1.0, 0.0 ],
-	    fa: 0.0, // UNUSED
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ 0.0, wallOffset, 0.0, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ 0.0, -1.0, 0.0 ]),
+	    fa: createVec4(), // UNUSED
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.5, 0.5, 0.5 ],
 	    ref: [ 0.4, 0.4, 0.4 ],
 	    f0: 0.8,
@@ -58,11 +65,11 @@ const gl_shapes_init = [
     },
     {
 	    name: "left_wall",
-	    type: SHAPE_TYPE_WALL,
-	    va: [ -wallOffset, 0.0, 0.0 ],
-	    vb: [ 1.0, 0.0, 0.0 ],
-	    fa: 0.0, // UNUSED
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ -wallOffset, 0.0, 0.0, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ 1.0, 0.0, 0.0 ]),
+	    fa: createVec4(), // UNUSED
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.5, 0.5, 0.8 ],
 	    ref: [ 0.5, 0.5, 0.8 ],
 	    f0: 0.8,
@@ -71,11 +78,11 @@ const gl_shapes_init = [
     },
     {
 	    name: "right_wall",
-	    type: SHAPE_TYPE_WALL,
-	    va: [ wallOffset, 0.0, 0.0 ],
-	    vb: [ -1.0, 0.0, 0.0 ],
-	    fa: 0.0, // UNUSED
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ wallOffset, 0.0, 0.0, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ -1.0, 0.0, 0.0 ]),
+	    fa: createVec4(), // UNUSED
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.25, 0.5, 0.25 ],
 	    ref: [ 0.25, 0.5, 0.25 ],
 	    f0: 0.8,
@@ -84,11 +91,11 @@ const gl_shapes_init = [
     },
     {
 	    name: "back_light_wall",
-	    type: SHAPE_TYPE_WALL,
-	    va: [ 0.0, 0.0, -2.0 ],
-	    vb: [ 0.0, 0.0, 1.0 ],
-	    fa: 0.0, // UNUSED
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ 0.0, 0.0, -2.0, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ 0.0, 0.0, 1.0 ]),
+	    fa: createVec4(), // UNUSED
+	    fb: createVec4(), // UNUSED
 	    col: [ 2.0, 2.0, 2.0 ],
 	    ref: [ 0.1, 0.1, 0.1 ],
 	    f0: 0.8,
@@ -97,72 +104,24 @@ const gl_shapes_init = [
     },
 
     {
-	    type: SHAPE_TYPE_SPHERE,
-	    va: [ -0.8, 0.7, 2.2 ],
-	    vb: [ 0.0, 0.0, 0.0 ], // UNUSED
-	    fa: 0.3,
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_SPHERE, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ -0.8, 0.7, 2.2, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4(), // UNUSED
+	    fa: [ 0.3, 0.0, 0.0, 0.0 ],
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.9, 0.9, 0.9 ],
 	    f0: 0.8,
 	    cr: 0,
-	    mu: 1.2,
-    },
-    {
-	    type: SHAPE_TYPE_SPHERE,
-	    va: [ 0.8, 0.9, 2.9 ],
-	    vb: [ 0.0, 0.0, 0.0 ], // UNUSED
-	    fa: 0.2,
-	    fb: 0.0, // UNUSED
-	    col: [ 0.0, 0.0, 0.0 ],
-	    ref: [ 0.9, 0.9, 0.9 ],
-	    f0: 0.8,
-	    cr: 1,
-	    mu: 1.2,
-    },
-    {
-	    type: SHAPE_TYPE_SPHERE,
-	    va: [ 0.4, -0.03, 2.2 ],
-	    vb: [ 0.0, 0.0, 0.0 ], // UNUSED
-	    fa: 0.18,
-	    fb: 0.0, // UNUSED
-	    col: [ 0.0, 0.0, 0.0 ],
-	    ref: [ 0.9, 0.9, 0.9 ],
-	    f0: 0.8,
-	    cr: 1,
 	    mu: 1.2,
     },
 
     {
-	    type: SHAPE_TYPE_CYLINDER,
-	    va: [ -0.6, -0.7, 3.2 ],
-	    vb: [ 0.0, 0.7, 1.8 ],
-	    fa: 0.1,
-	    fb: 0.0, // UNUSED
-	    col: [ 0.0, 0.0, 0.0 ],
-	    ref: [ 0.99, 0.99, 0.99 ],
-	    f0: 0.8,
-	    cr: 0,
-	    mu: 1.2,
-    },
-    {
-	    type: SHAPE_TYPE_CYLINDER,
-	    va: [ 0.0, 0.7, 1.8 ],
-	    vb: [ 0.9, -0.9, 0.4 ],
-	    fa: 0.05,
-	    fb: 0.0, // UNUSED
-	    col: [ 0.0, 0.0, 0.0 ],
-	    ref: [ 0.99, 0.99, 0.99 ],
-	    f0: 0.8,
-	    cr: 0,
-	    mu: 1.2,
-    },
-    {
-	    type: SHAPE_TYPE_CYLINDER,
-	    va: [ 0.9, -0.9, 0.4 ],
-	    vb: [ -0.6, 0.1, -0.5 ],
-	    fa: 0.025,
-	    fb: 0.0, // UNUSED
+	    type: [ SHAPE_TYPE_CYLINDER, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([ -0.6, -0.7, 3.2, SHAPE_OPERATION_ASSIGN ]),
+	    vb: createZerosMat4([ 0.0, 0.7, 1.8 ]),
+	    fa: [ 0.1, 0.0, 0.0, 0.0 ],
+	    fb: createVec4(), // UNUSED
 	    col: [ 0.0, 0.0, 0.0 ],
 	    ref: [ 0.99, 0.99, 0.99 ],
 	    f0: 0.8,
@@ -171,11 +130,14 @@ const gl_shapes_init = [
     },
 
     {
-	    type: SHAPE_TYPE_TORUS,
-	    va: [ -0.1, 0.0, 1.8 ],
-	    vb: [ 0.4, 0.0, 0.4 ],
-	    fa: 0.3,
-	    fb: 0.1,
+	    type: [ SHAPE_TYPE_TORUS, SHAPE_TYPE_SPHERE, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
+	    va: createZerosMat4([
+		-0.1, 0.0, 1.8, SHAPE_OPERATION_ASSIGN,
+		-0.1, -0.2, 1.8, SHAPE_OPERATION_INTERSECTION,
+		]),
+	    vb: createZerosMat4([ 0.4, 0.0, 0.4 ]),
+	    fa: [ 0.3, 0.2, 0.0, 0.0 ],
+	    fb: [ 0.1, 0.0, 0.0, 0.0 ],
 	    col: [ 0.15, 0.05, 0.05 ],
 	    ref: [ 0.3, 0.1, 0.1 ],
 	    f0: 0.8,
@@ -183,6 +145,7 @@ const gl_shapes_init = [
 	    mu: 1.4,
     },
 ];
+
 
 
 //// Render view
@@ -213,6 +176,12 @@ const fsSource =
 	#define SHAPE_TYPE_SPHERE 1
 	#define SHAPE_TYPE_CYLINDER 2
 	#define SHAPE_TYPE_TORUS 3
+
+	#define SHAPE_OPERATION_NONE 0.0
+	#define SHAPE_OPERATION_ASSIGN 1.0
+	#define SHAPE_OPERATION_UNION 2.0
+	#define SHAPE_OPERATION_INTERSECTION 3.0
+	#define SHAPE_OPERATION_DIFF 4.0
 
 	precision highp float;
 
@@ -247,11 +216,11 @@ const fsSource =
 
 	// Using struct makes compiling time very long
 	uniform int numberOfShapes;
-	uniform int shape_type[NUM_SHAPE_MAX];
-	uniform vec3 shape_va[NUM_SHAPE_MAX];
-	uniform vec3 shape_vb[NUM_SHAPE_MAX];
-	uniform float shape_fa[NUM_SHAPE_MAX];
-	uniform float shape_fb[NUM_SHAPE_MAX];
+	uniform ivec4 shape_type[NUM_SHAPE_MAX];
+	uniform mat4 shape_va[NUM_SHAPE_MAX];
+	uniform mat4 shape_vb[NUM_SHAPE_MAX];
+	uniform vec4 shape_fa[NUM_SHAPE_MAX];
+	uniform vec4 shape_fb[NUM_SHAPE_MAX];
 	uniform vec3 shape_col[NUM_SHAPE_MAX];
 	uniform vec3 shape_ref[NUM_SHAPE_MAX];
 	uniform float shape_f0[NUM_SHAPE_MAX]; // Fresnel reflection coefficient at perpendicular incident
@@ -268,19 +237,14 @@ const fsSource =
 		return fract(sin(dot(v, vec2(12.9898, 78.233))) * 43758.5453);
 	}
 
-	float d_intersection(float shape0, float shape1)
-	{
-		return max(shape0, shape1);
-	}
-
 	float d_union(float shape0, float shape1)
 	{
 		return min(shape0, shape1);
 	}
 
-	float d_crystal(float shape)
+	float d_intersection(float shape0, float shape1)
 	{
-		return abs(shape);
+		return max(shape0, shape1);
 	}
 
 	// Calculate shape0 - shape1
@@ -291,6 +255,12 @@ const fsSource =
 	{
 		return max(shape0, -shape1);
 	}
+
+	float d_crystal(float shape)
+	{
+		return abs(shape);
+	}
+
 
 	// args:
 	//     pos: position of center of the wall
@@ -344,46 +314,67 @@ const fsSource =
 		return length(p - ra * p_r) - rb;
 	}
 
+	float d_shape(int shape, vec3 pos)
+	{
+		float d;
+		float d_tmp;
+		for (int i = 0; i < 4; ++i) {
+			if (shape_va[shape][i].w == SHAPE_OPERATION_NONE) {
+				// DO NOTHING
+			} else if (shape_type[shape][i] == SHAPE_TYPE_WALL) {
+				////
+				// wall hit
+				////
+				d_tmp = d_plane(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, pos);
+			} else if (shape_type[shape][i] == SHAPE_TYPE_SPHERE) {
+				////
+				// sphere hit
+				////
+				d_tmp = d_sphere(shape_va[shape][i].xyz, shape_fa[shape][i], pos);
+			} else if (shape_type[shape][i] == SHAPE_TYPE_CYLINDER) {
+				////
+				// cylinder hit
+				////
+				d_tmp = d_cylinder(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, shape_fa[shape][i], pos);
+			} else if (shape_type[shape][i] == SHAPE_TYPE_TORUS) {
+				////
+				// torus hit
+				////
+				d_tmp = d_torus(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, shape_fa[shape][i], shape_fb[shape][i], pos);
+			}
+			// Logical operation
+			// SHAPE_OPERATION_NONE do nothing
+			if (shape_va[shape][i].w == SHAPE_OPERATION_ASSIGN) {
+				d = d_tmp;
+			} else if (shape_va[shape][i].w == SHAPE_OPERATION_UNION) {
+				d = d_union(d, d_tmp);
+			} else if (shape_va[shape][i].w == SHAPE_OPERATION_INTERSECTION) {
+				d = d_intersection(d, d_tmp);
+			} else if (shape_va[shape][i].w == SHAPE_OPERATION_DIFF) {
+				d = d_diff(d, d_tmp);
+			}
+		}
+		if (shape_cr[shape] != 0.0) {
+			d = d_crystal(d);
+		}
+
+		return d;
+	}
+
 	// args:
 	//     hit: the index of shape which the ray hits
 	vec3 getNormVec(TraceData ray, int hit)
 	{
 		vec3 norm;
 
-		if (shape_type[hit] == SHAPE_TYPE_WALL) {
-			// Get normal vector
-			norm.x = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dx) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dx);
-			norm.y = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dy) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dy);
-			norm.z = d_plane(shape_va[hit], shape_vb[hit], ray.pos + dz) - d_plane(shape_va[hit], shape_vb[hit], ray.pos - dz);
-
-			norm = normalize(norm);
-
-		} else if (shape_type[hit] == SHAPE_TYPE_SPHERE) {
-			// Get normal vector
-			norm.x = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dx) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dx);
-			norm.y = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dy) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dy);
-			norm.z = d_sphere(shape_va[hit], shape_fa[hit], ray.pos + dz) - d_sphere(shape_va[hit], shape_fa[hit], ray.pos - dz);
-
-			norm = normalize(norm);
-
-		} else if (shape_type[hit] == SHAPE_TYPE_CYLINDER) {
-			// Get normal vector
-			norm.x = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dx) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dx);
-			norm.y = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dy) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dy);
-			norm.z = d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos + dz) - d_cylinder(shape_va[hit], shape_vb[hit], shape_fa[hit], ray.pos - dz);
-
-			norm = normalize(norm);
-
-		} else if (shape_type[hit] == SHAPE_TYPE_TORUS) {
-			norm.x = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dx) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dx);
-			norm.y = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dy) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dy);
-			norm.z = d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos + dz) - d_torus(shape_va[hit], shape_vb[hit], shape_fa[hit], shape_fb[hit], ray.pos - dz);
-
-			norm = normalize(norm);
-		}
+		norm.x = d_shape(hit, ray.pos + dx) - d_shape(hit, ray.pos - dx);
+		norm.y = d_shape(hit, ray.pos + dy) - d_shape(hit, ray.pos - dy);
+		norm.z = d_shape(hit, ray.pos + dz) - d_shape(hit, ray.pos - dz);
+		norm = normalize(norm);
 
 		return norm;
 	}
+
 
 	// args:
 	//     origin: start point of ray
@@ -392,36 +383,11 @@ const fsSource =
 		const float d_ep = RAY_MARCHING_DISTANCE_EPSILON;
 
 		for (int i = 0; i < MAX_ITER_MARCHING; ++i) {
-			float d; // temporary distance between current ray position and objects
 			float d_min = 1000.0;
 			int hit = -1;
 
 			for (int k = 0; k < min(numberOfShapes, NUM_SHAPE_MAX); ++k) {
-				if (shape_type[k] == SHAPE_TYPE_WALL) {
-					////
-					// wall hit
-					////
-					d = d_plane(shape_va[k], shape_vb[k], ray.pos);
-				} else if (shape_type[k] == SHAPE_TYPE_SPHERE) {
-					////
-					// sphere hit
-					////
-					d = d_sphere(shape_va[k], shape_fa[k], ray.pos);
-				} else if (shape_type[k] == SHAPE_TYPE_CYLINDER) {
-					////
-					// cylinder hit
-					////
-					d = d_cylinder(shape_va[k], shape_vb[k], shape_fa[k], ray.pos);
-				} else if (shape_type[k] == SHAPE_TYPE_TORUS) {
-					////
-					// torus hit
-					////
-					d = d_torus(shape_va[k], shape_vb[k], shape_fa[k], shape_fb[k], ray.pos);
-				}
-				if (shape_cr[k] != 0.0) {
-					d = d_crystal(d);
-				}
-
+				float d = d_shape(k, ray.pos);
 				d_min = min(d, d_min);
 				if (d < d_ep) {
 					hit = k;
@@ -676,11 +642,11 @@ function addWall(
     mu = 1.2)
 {
 	const obj = {
-		type: SHAPE_TYPE_WALL,
-		va: pos,
-		vb: dir,
-		fa: 0.0, // UNUSED
-		fb: 0.0, // UNUSED
+		type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		va: createZerosMat4(pos),
+		vb: createZerosMat4(dir),
+		fa: createVec4(), // UNUSED
+		fb: createVec4(), // UNUSED
 		col: col,
 		ref: ref,
 		f0: f0,
@@ -704,11 +670,11 @@ function addSphere(
     mu = 1.2)
 {
 	const obj = {
-		type: SHAPE_TYPE_SPHERE,
-		va: pos,
-		vb: [ 0.0, 0.0, 0.0 ], // UNUSED
-		fa: radius,
-		fb: 0.0, // UNUSED
+		type: [ SHAPE_TYPE_SPHERE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		va: createZerosMat4(pos),
+		vb: createZerosMat4(), // UNUSED
+		fa: [ radius, 0.0, 0.0, 0.0 ],
+		fb: createVec4(), // UNUSED
 		col: col,
 		ref: ref,
 		f0: f0,
@@ -733,11 +699,11 @@ function addCylinder(
     mu = 1.2)
 {
 	const obj = {
-		type: SHAPE_TYPE_CYLINDER,
-		va: pos0,
-		vb: pos1,
-		fa: radius,
-		fb: 0.0, // UNUSED
+		type: [ SHAPE_TYPE_CYLINDER, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		va: createZerosMat4(pos0),
+		vb: createZerosMat4(pos1),
+		fa: [ radius, 0.0, 0.0, 0.0 ],
+		fb: createVec4(), // UNUSED
 		col: col,
 		ref: ref,
 		f0: f0,
@@ -763,11 +729,11 @@ function addTorus(
     mu = 1.2)
 {
 	const obj = {
-		type: SHAPE_TYPE_TORUS,
-		va: pos,
-		vb: dir,
-		fa: radius0,
-		fb: radius1,
+		type: [ SHAPE_TYPE_TORUS, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		va: createZerosMat4(pos),
+		vb: createZerosMat4(dir),
+		fa: [ radius0, 0.0, 0.0, 0.0 ],
+		fb: [ radius1, 0.0, 0.0, 0.0 ],
 		col: col,
 		ref: ref,
 		f0: f0,
@@ -787,7 +753,7 @@ function addPrimitiveController(obj, id)
 {
 	const panel = document.createElement("div");
 	panel.className = "primitiveControlPanel";
-	panel.id = "primitiveController_" + SHAPE_TYPE_NAME[obj.type] + "_" + id;
+	panel.id = "primitiveController_" + SHAPE_TYPE_NAME[obj.type[0]] + "_" + id;
 	
 	// Title
 	const title_bar = document.createElement("div");
@@ -796,7 +762,7 @@ function addPrimitiveController(obj, id)
 	const name = document.createElement("input");
 	name.type = "text";
 	name.className = "primitiveControlPanelName";
-	name.value = "" + SHAPE_TYPE_NAME[obj.type] + "_" + id;
+	name.value = "" + SHAPE_TYPE_NAME[obj.type[0]] + "_" + id;
 	if ("name" in obj) {
 		name.value = obj.name;
 	}
@@ -830,7 +796,7 @@ function addPrimitiveController(obj, id)
 		});
 
 	// Switches
-	if (obj.type === SHAPE_TYPE_WALL) {
+	if (obj.type[0] === SHAPE_TYPE_WALL) {
 		const position = createControlPanelVector3Control(
 		    panel.id, "position",
 		    "pos_X", obj.va[0],
@@ -855,9 +821,16 @@ function addPrimitiveController(obj, id)
 		    "green", obj.ref[1],
 		    "blue", obj.ref[2]);
 		panel.appendChild(reflection);
-		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		const f0 = createControlPanelInputText(
+		    panel.id,
+		    "reflection F0",
+		    obj.f0);
 		panel.appendChild(f0);
-		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		const crystal = createControlPanelBoolSwitch(
+		    panel.id,
+		    "crystal",
+		    "enable",
+		    obj.cr != 0);
 		panel.appendChild(crystal);
 
 		panel.addEventListener("change",
@@ -872,7 +845,7 @@ function addPrimitiveController(obj, id)
 				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
-	} else if (obj.type === SHAPE_TYPE_SPHERE) {
+	} else if (obj.type[0] === SHAPE_TYPE_SPHERE) {
 		const position = createControlPanelVector3Control(
 		    panel.id, "position",
 		    "pos_X", obj.va[0],
@@ -881,7 +854,7 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(position);
 		const radius = createControlPanelInputText(
 		    panel.id, "radius",
-		    obj.fa);
+		    obj.fa[0]);
 		panel.appendChild(radius);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -895,9 +868,16 @@ function addPrimitiveController(obj, id)
 		    "green", obj.ref[1],
 		    "blue", obj.ref[2]);
 		panel.appendChild(reflection);
-		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		const f0 = createControlPanelInputText(
+		    panel.id,
+		    "reflection F0",
+		    obj.f0);
 		panel.appendChild(f0);
-		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		const crystal = createControlPanelBoolSwitch(
+		    panel.id,
+		    "crystal",
+		    "enable",
+		    obj.cr != 0);
 		panel.appendChild(crystal);
 
 		panel.addEventListener("change",
@@ -907,12 +887,12 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius.controls[0].value;
+				obj.fa[0] = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
-	} else if (obj.type === SHAPE_TYPE_CYLINDER) {
+	} else if (obj.type[0] === SHAPE_TYPE_CYLINDER) {
 		const position0 = createControlPanelVector3Control(
 		    panel.id, "position_start",
 		    "pos_X", obj.va[0],
@@ -927,7 +907,7 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(position1);
 		const radius = createControlPanelInputText(
 		    panel.id, "radius",
-		    obj.fa);
+		    obj.fa[0]);
 		panel.appendChild(radius);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -941,9 +921,16 @@ function addPrimitiveController(obj, id)
 		    "green", obj.ref[1],
 		    "blue", obj.ref[2]);
 		panel.appendChild(reflection);
-		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		const f0 = createControlPanelInputText(
+		    panel.id,
+		    "reflection F0",
+		    obj.f0);
 		panel.appendChild(f0);
-		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		const crystal = createControlPanelBoolSwitch(
+		    panel.id,
+		    "crystal",
+		    "enable",
+		    obj.cr != 0);
 		panel.appendChild(crystal);
 
 		panel.addEventListener("change",
@@ -954,12 +941,12 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius.controls[0].value;
+				obj.fa[0] = radius.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
 
-	} else if (obj.type === SHAPE_TYPE_TORUS) {
+	} else if (obj.type[0] === SHAPE_TYPE_TORUS) {
 		const position = createControlPanelVector3Control(
 		    panel.id, "position",
 		    "pos_X", obj.va[0],
@@ -974,11 +961,11 @@ function addPrimitiveController(obj, id)
 		panel.appendChild(direction);
 		const radius0= createControlPanelInputText(
 		    panel.id, "radius0",
-		    obj.fa);
+		    obj.fa[0]);
 		panel.appendChild(radius0);
 		const radius1 = createControlPanelInputText(
 		    panel.id, "radius1",
-		    obj.fb);
+		    obj.fb[0]);
 		panel.appendChild(radius1);
 		const color = createControlPanelVector3Control(
 		    panel.id, "light_emission",
@@ -992,9 +979,16 @@ function addPrimitiveController(obj, id)
 		    "green", obj.ref[1],
 		    "blue", obj.ref[2]);
 		panel.appendChild(reflection);
-		const f0 = createControlPanelInputText(panel.id, "reflection F0", obj.f0);
+		const f0 = createControlPanelInputText(
+		    panel.id,
+		    "reflection F0",
+		    obj.f0);
 		panel.appendChild(f0);
-		const crystal = createControlPanelBoolSwitch(panel.id, "crystal", "enable", obj.cr != 0);
+		const crystal = createControlPanelBoolSwitch(
+		    panel.id,
+		    "crystal",
+		    "enable",
+		    obj.cr != 0);
 		panel.appendChild(crystal);
 
 		panel.addEventListener("change",
@@ -1005,8 +999,8 @@ function addPrimitiveController(obj, id)
 					obj.col[i] = color.controls[i].value;
 					obj.ref[i] = reflection.controls[i].value;
 				}
-				obj.fa = radius0.controls[0].value;
-				obj.fb = radius1.controls[0].value;
+				obj.fa[0] = radius0.controls[0].value;
+				obj.fb[0] = radius1.controls[0].value;
 				obj.f0 = f0.controls[0].value;
 				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
 			});
@@ -1370,19 +1364,21 @@ function drawScene(gl, renderProgramInfo, screenBuffers)
 	    renderProgramInfo.uniformLocations.max_iter,
 	    realistic_render ? 2.0 : 1.0);
 	for (let i = 0; i < gl_shapes.length; ++i) {
-		gl.uniform1i(
+		gl.uniform4iv(
 		    renderProgramInfo.uniformLocations.shapes[i].type,
 		    gl_shapes[i].type);
-		gl.uniform3fv(
+		gl.uniformMatrix4fv(
 		    renderProgramInfo.uniformLocations.shapes[i].va,
+		    false,
 		    gl_shapes[i].va);
-		gl.uniform3fv(
+		gl.uniformMatrix4fv(
 		    renderProgramInfo.uniformLocations.shapes[i].vb,
+		    false,
 		    gl_shapes[i].vb);
-		gl.uniform1f(
+		gl.uniform4fv(
 		    renderProgramInfo.uniformLocations.shapes[i].fa,
 		    gl_shapes[i].fa);
-		gl.uniform1f(
+		gl.uniform4fv(
 		    renderProgramInfo.uniformLocations.shapes[i].fb,
 		    gl_shapes[i].fb);
 		gl.uniform3fv(
@@ -1447,6 +1443,28 @@ function createIdenticalMat4() {
 	A[1] = 0.0; A[5] = 1.0; A[9]  = 0.0; A[13] = 0.0;
 	A[2] = 0.0; A[6] = 0.0; A[10] = 1.0; A[14] = 0.0;
 	A[3] = 0.0; A[7] = 0.0; A[11] = 0.0; A[15] = 1.0;
+	return A;
+}
+
+function createVec4()
+{
+	let v = new Array(4);
+	v[0] = 0.0;
+	v[1] = 0.0;
+	v[2] = 0.0;
+	v[3] = 0.0;
+	return v;
+}
+
+function createZerosMat4(initials = [])
+{
+	let A = new Array(16);
+	for (let i = 0; i < Math.min(initials.length, 16); ++i) {
+		A[i] = initials[i];
+	}
+	for (let i = initials.length; i < 16; ++i) {
+		A[i] = 0.0;
+	}
 	return A;
 }
 
