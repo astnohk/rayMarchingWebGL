@@ -470,9 +470,17 @@ var touchCenter_prev = { x: 0, y: 0 };
 //        Initialize
 //
 ////////////////////////////////////////////////////////////////
-window.onload = init;
+
+//window.onload = init;
 
 function init() {
+	// Close confirmation window
+	const bg = document.getElementById("floating_background");
+	bg.style.opacity = "0.0";
+	setTimeout(
+	    () => { bg.remove(); },
+	    1000);
+
 	// Initialize HTML
 	// Event
 	window.addEventListener(

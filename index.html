@@ -13,6 +13,30 @@ body {
 	top: 0px;
 }
 
+#floating_background {
+	opacity: 1.0;
+	position: fixed;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+	background-color: rgba(0,0,0, 0.8);
+	transition-property: opacity;
+	transition-timing-function: linear;
+	transition-duration: 1s;
+}
+
+#floating_window {
+	position: relative;
+	display: block;
+	padding: 10px;
+	color: rgb(255,24,24);
+	background-color: rgba(0,0,64, 0.9);
+}
+
 label {
 	margin: 2px;
 	min-width: 40px;
@@ -177,10 +201,6 @@ input[type="button"] {
 </head>
 <body>
 <div id="inputs">
-	<!--
-	<label>max_iter</label><input type="text" id="maxIterationCount">
-	<input type="button" id="maxIterationCountDec" value="-">
-	-->
 	<input type="button" id="realisticRenderSwitch" value="realistic_render">
 </div>
 <canvas id="glcanvas" width="512" height="512"></canvas>
@@ -190,6 +210,26 @@ input[type="button"] {
 		<div class="addPrimitiveObjectButton" id="addSphereButton" onclick="addSphere()">+sphere</div>
 		<div class="addPrimitiveObjectButton" id="addCylinderButton" onclick="addCylinder()">+cylinder</div>
 		<div class="addPrimitiveObjectButton" id="addTorusButton" onclick="addTorus()">+torus</div>
+	</div>
+</div>
+
+<div id="floating_background">
+	<div id="floating_window">
+		<div
+		style="
+		    font-size: 48px;
+		    font-weight: bold;
+		    color: rgb(255,64,64);
+		    text-shadow: -9px -2px 0px rgba(0,0,255, 0.7);
+		">
+		CAUTION CAUTION CAUTION
+		</div>
+		This demonstration will use the GPU resources very heavYly.<br>
+		Your browser may away from YOUR CONTROLS for few ten minutes.<br><br>
+		<div style="font-weight: bold; color: rgb(255,128,255);">
+		Press "confirmed" button to start demo.
+		</div>
+		<input type="button" onclick="init()" value="confirmed" style="font-size: 32px; color: rgb(255,128,128);">
 	</div>
 </div>
 </body>
