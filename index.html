@@ -23,6 +23,7 @@ body {
 	left: 0px;
 	right: 0px;
 	bottom: 0px;
+	font-size: 16px;
 	background-color: rgba(0,0,0, 0.8);
 	transition-property: opacity;
 	transition-timing-function: linear;
@@ -225,11 +226,17 @@ input[type="button"] {
 		CAUTION CAUTION CAUTION
 		</div>
 		This demonstration will use the GPU resources very heavYly.<br>
-		Your browser may away from YOUR CONTROLS for few ten minutes.<br><br>
+		Your browser may away from YOUR CONTROLS for few minutes.<br><br>
 		<div style="font-weight: bold; color: rgb(255,128,255);">
 		Press "confirmed" button to start demo.
 		</div>
 		<input type="button" onclick="init()" value="confirmed" style="font-size: 32px; color: rgb(255,128,128);">
+		<br>
+		<div style="font-size: 12px; color: rgb(200,200,216);">
+		Strongly RECOMMENDED: ANGLE in your browser should be disabled.<br>
+		If ANGLE is enabled, it leads very long compiling time.
+		(ANGLE is enabled by default in almost all browsers)
+		</div>
 	</div>
 </div>
 </body>
