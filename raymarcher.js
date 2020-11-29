@@ -23,6 +23,13 @@ const SHAPE_OPERATION_ASSIGN = 1;
 const SHAPE_OPERATION_UNION = 2;
 const SHAPE_OPERATION_INTERSECTION = 3;
 const SHAPE_OPERATION_DIFF = 4;
+const SHAPE_OPERATION_NAME = [
+    "none",
+    "assign",
+    "union",
+    "intersection",
+    "diff",
+];
 
 const KEYBOARD_CONTROL_COEFFICIENT = 0.01;
 const TOUCH_CONTROL_COEFFICIENT = 0.005;
@@ -318,29 +325,69 @@ const fsSource =
 	{
 		float d;
 		float d_tmp;
-		for (int i = 0; i < 4; ++i) {
+		// Original shape
+		if (shape_va[shape][0].w == SHAPE_OPERATION_NONE) {
+			// DO NOTHING
+		} else if (shape_type[shape][0] == SHAPE_TYPE_WALL) {
+			////
+			// wall hit
+			////
+			d = d_plane(shape_va[shape][0].xyz, shape_vb[shape][0].xyz, pos);
+		} else if (shape_type[shape][0] == SHAPE_TYPE_SPHERE) {
+			////
+			// sphere hit
+			////
+			d = d_sphere(shape_va[shape][0].xyz, shape_fa[shape][0], pos);
+		} else if (shape_type[shape][0] == SHAPE_TYPE_CYLINDER) {
+			////
+			// cylinder hit
+			////
+			d = d_cylinder(shape_va[shape][0].xyz, shape_vb[shape][0].xyz, shape_fa[shape][0], pos);
+		} else if (shape_type[shape][0] == SHAPE_TYPE_TORUS) {
+			////
+			// torus hit
+			////
+			d = d_torus(shape_va[shape][0].xyz, shape_vb[shape][0].xyz, shape_fa[shape][0], shape_fb[shape][0], pos);
+		}
+		// Logical operation
+		for (int i = 1; i < 4; ++i) {
 			if (shape_va[shape][i].w == SHAPE_OPERATION_NONE) {
 				// DO NOTHING
 			} else if (shape_type[shape][i] == SHAPE_TYPE_WALL) {
 				////
 				// wall hit
 				////
-				d_tmp = d_plane(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, pos);
+				d_tmp = d_plane(
+				    shape_va[shape][0].xyz + shape_va[shape][i].xyz,
+				    shape_vb[shape][i].xyz,
+				    pos);
 			} else if (shape_type[shape][i] == SHAPE_TYPE_SPHERE) {
 				////
 				// sphere hit
 				////
-				d_tmp = d_sphere(shape_va[shape][i].xyz, shape_fa[shape][i], pos);
+				d_tmp = d_sphere(
+				    shape_va[shape][0].xyz + shape_va[shape][i].xyz,
+				    shape_fa[shape][i],
+				    pos);
 			} else if (shape_type[shape][i] == SHAPE_TYPE_CYLINDER) {
 				////
 				// cylinder hit
 				////
-				d_tmp = d_cylinder(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, shape_fa[shape][i], pos);
+				d_tmp = d_cylinder(
+				    shape_va[shape][0].xyz + shape_va[shape][i].xyz,
+				    shape_vb[shape][i].xyz,
+				    shape_fa[shape][i],
+				    pos);
 			} else if (shape_type[shape][i] == SHAPE_TYPE_TORUS) {
 				////
 				// torus hit
 				////
-				d_tmp = d_torus(shape_va[shape][i].xyz, shape_vb[shape][i].xyz, shape_fa[shape][i], shape_fb[shape][i], pos);
+				d_tmp = d_torus(
+				    shape_va[shape][0].xyz + shape_va[shape][i].xyz,
+				    shape_vb[shape][i].xyz,
+				    shape_fa[shape][i],
+				    shape_fb[shape][i],
+				    pos);
 			}
 			// Logical operation
 			// SHAPE_OPERATION_NONE do nothing
@@ -633,6 +680,7 @@ function init() {
 
 function addObject(obj)
 {
+	// Make main panel
 	const controllPanel = addPrimitiveController(obj, gl_shapes.length);
 	document.getElementById("tools").appendChild(controllPanel);
 
@@ -650,7 +698,7 @@ function addWall(
     mu = 1.2)
 {
 	const obj = {
-		type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		type: [ SHAPE_TYPE_WALL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
 		va: createZerosMat4(pos),
 		vb: createZerosMat4(dir),
 		fa: createVec4(), // UNUSED
@@ -678,7 +726,7 @@ function addSphere(
     mu = 1.2)
 {
 	const obj = {
-		type: [ SHAPE_TYPE_SPHERE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		type: [ SHAPE_TYPE_SPHERE, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
 		va: createZerosMat4(pos),
 		vb: createZerosMat4(), // UNUSED
 		fa: [ radius, 0.0, 0.0, 0.0 ],
@@ -707,7 +755,7 @@ function addCylinder(
     mu = 1.2)
 {
 	const obj = {
-		type: [ SHAPE_TYPE_CYLINDER, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		type: [ SHAPE_TYPE_CYLINDER, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
 		va: createZerosMat4(pos0),
 		vb: createZerosMat4(pos1),
 		fa: [ radius, 0.0, 0.0, 0.0 ],
@@ -737,7 +785,7 @@ function addTorus(
     mu = 1.2)
 {
 	const obj = {
-		type: [ SHAPE_TYPE_TORUS, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE, SHAPE_TYPE_NONE ],
+		type: [ SHAPE_TYPE_TORUS, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL, SHAPE_TYPE_NULL ],
 		va: createZerosMat4(pos),
 		vb: createZerosMat4(dir),
 		fa: [ radius0, 0.0, 0.0, 0.0 ],
@@ -759,6 +807,10 @@ function addTorus(
 
 function addPrimitiveController(obj, id)
 {
+	// Operation type of the object #0 should be SHAPE_OPERATION_ASSIGN
+	obj.va[3] = SHAPE_OPERATION_ASSIGN;
+
+	// Make main panel
 	const panel = document.createElement("div");
 	panel.className = "primitiveControlPanel";
 	panel.id = "primitiveController_" + SHAPE_TYPE_NAME[obj.type[0]] + "_" + id;
@@ -844,13 +896,13 @@ function addPrimitiveController(obj, id)
 		panel.addEventListener("change",
 			(e) => {
 				for (let i = 0; i < 3; ++i) {
-					obj.va[i] = position.controls[i].value;
-					obj.vb[i] = direction.controls[i].value;
-					obj.col[i] = color.controls[i].value;
-					obj.ref[i] = reflection.controls[i].value;
+					obj.va[i] = parseFloat(position.controls[i].value);
+					obj.vb[i] = parseFloat(direction.controls[i].value);
+					obj.col[i] = parseFloat(color.controls[i].value);
+					obj.ref[i] = parseFloat(reflection.controls[i].value);
 				}
-				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
+				obj.f0 = parseFloat(f0.controls[0].value);
+				obj.cr = parseFloat(crystal.controls[0].checked ? obj.mu : 0.0);
 			});
 
 	} else if (obj.type[0] === SHAPE_TYPE_SPHERE) {
@@ -891,13 +943,13 @@ function addPrimitiveController(obj, id)
 		panel.addEventListener("change",
 			(e) => {
 				for (let i = 0; i < 3; ++i) {
-					obj.va[i] = position.controls[i].value;
-					obj.col[i] = color.controls[i].value;
-					obj.ref[i] = reflection.controls[i].value;
+					obj.va[i] = parseFloat(position.controls[i].value);
+					obj.col[i] = parseFloat(color.controls[i].value);
+					obj.ref[i] = parseFloat(reflection.controls[i].value);
 				}
-				obj.fa[0] = radius.controls[0].value;
-				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
+				obj.fa[0] = parseFloat(radius.controls[0].value);
+				obj.f0 = parseFloat(f0.controls[0].value);
+				obj.cr = parseFloat(crystal.controls[0].checked ? obj.mu : 0.0);
 			});
 
 	} else if (obj.type[0] === SHAPE_TYPE_CYLINDER) {
@@ -944,14 +996,14 @@ function addPrimitiveController(obj, id)
 		panel.addEventListener("change",
 			(e) => {
 				for (let i = 0; i < 3; ++i) {
-					obj.va[i] = position0.controls[i].value;
-					obj.vb[i] = position1.controls[i].value;
-					obj.col[i] = color.controls[i].value;
-					obj.ref[i] = reflection.controls[i].value;
+					obj.va[i] = parseFloat(position0.controls[i].value);
+					obj.vb[i] = parseFloat(position1.controls[i].value);
+					obj.col[i] = parseFloat(color.controls[i].value);
+					obj.ref[i] = parseFloat(reflection.controls[i].value);
 				}
-				obj.fa[0] = radius.controls[0].value;
-				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
+				obj.fa[0] = parseFloat(radius.controls[0].value);
+				obj.f0 = parseFloat(f0.controls[0].value);
+				obj.cr = parseFloat(crystal.controls[0].checked ? obj.mu : 0.0);
 			});
 
 	} else if (obj.type[0] === SHAPE_TYPE_TORUS) {
@@ -1002,18 +1054,221 @@ function addPrimitiveController(obj, id)
 		panel.addEventListener("change",
 			(e) => {
 				for (let i = 0; i < 3; ++i) {
-					obj.va[i] = position.controls[i].value;
-					obj.vb[i] = direction.controls[i].value;
-					obj.col[i] = color.controls[i].value;
-					obj.ref[i] = reflection.controls[i].value;
+					obj.va[i] = parseFloat(position.controls[i].value);
+					obj.vb[i] = parseFloat(direction.controls[i].value);
+					obj.col[i] = parseFloat(color.controls[i].value);
+					obj.ref[i] = parseFloat(reflection.controls[i].value);
 				}
-				obj.fa[0] = radius0.controls[0].value;
-				obj.fb[0] = radius1.controls[0].value;
-				obj.f0 = f0.controls[0].value;
-				obj.cr = crystal.controls[0].checked ? obj.mu : 0;
+				obj.fa[0] = parseFloat(radius0.controls[0].value);
+				obj.fb[0] = parseFloat(radius1.controls[0].value);
+				obj.f0 = parseFloat(f0.controls[0].value);
+				obj.cr = parseFloat(crystal.controls[0].checked ? obj.mu : 0.0);
 			});
 
 	}
+
+	// Add panels for boolean operation
+	const boolean_grid = document.createElement("div");
+	boolean_grid.className = "primitiveControlPanelGrid";
+	panel.appendChild(boolean_grid);
+	for (let num = 1; num < 4; ++num) {
+		const panel_boolean = addPrimitiveControllerBoolean(obj, id, num, panel);
+		boolean_grid.appendChild(panel_boolean);
+	}
+
+	return panel;
+}
+
+function addPrimitiveControllerBoolean(obj, id, num, parent_panel)
+{
+	const panel = document.createElement("div");
+	panel.className = "primitiveControlPanel";
+	panel.id = "primitiveController_" + SHAPE_TYPE_NAME[obj.type[0]] + "_" + id + "_" + num;
+	
+	// Selector
+	const title_bar = document.createElement("div");
+	title_bar.className = "primitiveControlPanelTitleBar";
+	panel.appendChild(title_bar);
+	// Shape Selector
+	const selector_shape = document.createElement("select");
+	selector_shape.className = "primitiveControlPanelSelector";
+	title_bar.appendChild(selector_shape);
+	// Shape Selector - Options
+	for (let i = 0; i < SHAPE_TYPE_NAME.length; ++i) {
+		const option_shape = document.createElement("option");
+		option_shape.text = SHAPE_TYPE_NAME[i];
+		selector_shape.appendChild(option_shape);
+	}
+	// Operator Selector
+	const selector_operation = document.createElement("select");
+	selector_operation.className = "primitiveControlPanelSelector";
+	title_bar.appendChild(selector_operation);
+	// Operator Selector - Options
+	for (let i = 0; i < SHAPE_OPERATION_NAME.length; ++i) {
+		const option_operation = document.createElement("option");
+		option_operation.text = SHAPE_OPERATION_NAME[i];
+		selector_operation.appendChild(option_operation);
+	}
+
+	// Pulldown button
+	const pulldown = document.createElement("div");
+	pulldown.className = "primitiveControlPanelPulldown";
+	pulldown.innerHTML = "V";
+	pulldown.pulldownState = false;
+	title_bar.appendChild(pulldown);
+	pulldown.addEventListener("click",
+		(e) => {
+			pulldown.pulldownState = !pulldown.pulldownState;
+			if (pulldown.pulldownState) {
+				panel.style.height = panel.scrollHeight + "px";
+				// Extend parent panel height
+				setTimeout(
+					() => {
+						parent_panel.style.height = parent_panel.scrollHeight + "px";
+					},
+					250);
+				// Rotate pulldown button
+				pulldown.style.transform = "rotate(0.5turn)";
+			} else {
+				panel.style.height = "40px";
+				// Shrink parent panel height
+				parent_panel.style.height = parent_panel.scrollHeight - panel.scrollHeight + 20 + "px";
+				// Rotate pulldown button
+				pulldown.style.transform = "rotate(0.0turn)";
+			}
+		});
+
+	// Swithces
+	const switches = document.createElement("div");
+	switches.className = "primitiveControlPanel";
+	switches.id = panel.id + "_" + num + "_switches";
+	switches.style.height = "auto";
+	panel.switchPanel = switches;
+	panel.appendChild(switches);
+
+	selector_operation.addEventListener("change",
+		(e) => {
+			const ope_name = selector_operation.value;
+			const ope = SHAPE_OPERATION_NAME.indexOf(ope_name);
+			obj.va[4 * num + 3] = ope;
+		});
+
+	selector_shape.addEventListener("change",
+		(e) => {
+			const shape_name = selector_shape.value;
+			const shape = SHAPE_TYPE_NAME.indexOf(shape_name);
+			obj.type[num] = shape;
+			// Clear current panel
+			while (switches.children.length > 0) {
+				switches.children[0].remove();
+			}
+			// Rebuild switches
+			if (obj.type[num] === SHAPE_TYPE_WALL) {
+				const position = createControlPanelVector3Control(
+				    switches.id, "position",
+				    "pos_X", obj.va[4 * num + 0],
+				    "pos_Y", obj.va[4 * num + 1],
+				    "pos_Z", obj.va[4 * num + 2]);
+				switches.appendChild(position);
+				const direction = createControlPanelVector3Control(
+				    switches.id, "direction",
+				    "dir_X", obj.vb[4 * num + 0],
+				    "dir_Y", obj.vb[4 * num + 1],
+				    "dir_Z", obj.vb[4 * num + 2]);
+				switches.appendChild(direction);
+
+				switches.addEventListener("change",
+					(e) => {
+						for (let i = 0; i < 3; ++i) {
+							obj.va[4 * num + i] = parseFloat(position.controls[i].value);
+							obj.vb[4 * num + i] = parseFloat(direction.controls[i].value);
+						}
+					});
+
+			} else if (obj.type[num] === SHAPE_TYPE_SPHERE) {
+				const position = createControlPanelVector3Control(
+				    switches.id, "position",
+				    "pos_X", obj.va[4 * num + 0],
+				    "pos_Y", obj.va[4 * num + 1],
+				    "pos_Z", obj.va[4 * num + 2]);
+				switches.appendChild(position);
+				const radius = createControlPanelInputText(
+				    switches.id, "radius",
+				    obj.fa[num]);
+				switches.appendChild(radius);
+
+				switches.addEventListener("change",
+					(e) => {
+						for (let i = 0; i < 3; ++i) {
+							obj.va[4 * num + i] = parseFloat(position.controls[i].value);
+						}
+						obj.fa[num] = parseFloat(radius.controls[0].value);
+					});
+
+			} else if (obj.type[num] === SHAPE_TYPE_CYLINDER) {
+				const position0 = createControlPanelVector3Control(
+				    switches.id, "position_start",
+				    "pos_X", obj.va[4 * num + 0],
+				    "pos_Y", obj.va[4 * num + 1],
+				    "pos_Z", obj.va[4 * num + 2]);
+				switches.appendChild(position0);
+				const position1 = createControlPanelVector3Control(
+				    switches.id, "position_end",
+				    "pos_X", obj.vb[4 * num + 0],
+				    "pos_Y", obj.vb[4 * num + 1],
+				    "pos_Z", obj.vb[4 * num + 2]);
+				switches.appendChild(position1);
+				const radius = createControlPanelInputText(
+				    switches.id, "radius",
+				    obj.fa[num]);
+				switches.appendChild(radius);
+
+				switches.addEventListener("change",
+					(e) => {
+						for (let i = 0; i < 3; ++i) {
+							obj.va[4 * num + i] = parseFloat(position0.controls[i].value);
+							obj.vb[4 * num + i] = parseFloat(position1.controls[i].value);
+						}
+						obj.fa[num] = parseFloat(radius.controls[0].value);
+					});
+
+			} else if (obj.type[num] === SHAPE_TYPE_TORUS) {
+				const position = createControlPanelVector3Control(
+				    switches.id, "position",
+				    "pos_X", obj.va[4 * num + 0],
+				    "pos_Y", obj.va[4 * num + 1],
+				    "pos_Z", obj.va[4 * num + 2]);
+				switches.appendChild(position);
+				const direction = createControlPanelVector3Control(
+				    switches.id, "direction",
+				    "dir_X", obj.vb[4 * num + 0],
+				    "dir_Y", obj.vb[4 * num + 1],
+				    "dir_Z", obj.vb[4 * num + 2]);
+				switches.appendChild(direction);
+				const radius0= createControlPanelInputText(
+				    switches.id, "radius0",
+				    obj.fa[num]);
+				switches.appendChild(radius0);
+				const radius1 = createControlPanelInputText(
+				    switches.id, "radius1",
+				    obj.fb[num]);
+				switches.appendChild(radius1);
+
+				switches.addEventListener("change",
+					(e) => {
+						for (let i = 0; i < 3; ++i) {
+							obj.va[4 * num + i] = parseFloat(position.controls[i].value);
+							obj.vb[4 * num + i] = parseFloat(direction.controls[i].value);
+						}
+						obj.fa[num] = parseFloat(radius0.controls[0].value);
+						obj.fb[num] = parseFloat(radius1.controls[0].value);
+					});
+
+			}
+		});
+	// Fire change event to create current shape menu
+	const ev = new Event("change", { bubbles: true });
+	selector_shape.dispatchEvent(ev);
 
 	return panel;
 }
