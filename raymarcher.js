@@ -445,7 +445,7 @@ const fsSource =
 			ray.pos += ray.dir * d_min;
 
 			// Add fog
-			ray.col += vec3(0.10, 0.10, 0.17) * ray.reflection * log(1.0 + d_min) * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
+			ray.col += vec3(0.03, 0.03, 0.06) * ray.reflection * log(1.0 + d_min) * abs(random(vec2(seed, ray.pos.x + ray.pos.y + ray.pos.z)));
 			ray.reflection *= exp(-0.1 * d_min); // attenuation
 
 			if (hit >= 0) {
