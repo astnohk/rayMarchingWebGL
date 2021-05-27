@@ -1,5 +1,13 @@
 "use strict";
 
+
+let maximum_iteration_number_in_realistic_render_mode = 18.0;
+let ray_tracing_focus_distance = 2.2;
+let ray_tracing_f = 14.0;
+
+
+
+
 const DIMENSION_NUM_3 = 3;
 const DIMENSION_NUM_3_X = 0;
 const DIMENSION_NUM_3_Y = 1;
@@ -220,6 +228,8 @@ const fsSource =
 	uniform float seed;
 	uniform vec3 cameraPosition;
 	uniform float max_iter;
+	uniform float focus;
+	uniform float f_val;
 
 	// Using struct makes compiling time very long
 	uniform int numberOfShapes;
@@ -478,20 +488,40 @@ const fsSource =
 		return ray;
 	}
 
+	#define BLUR_CIRCLE_RADIUS_COEFF 0.1
+	#define MULTI_PATH_RTX_BRIGHTNESS_CORRECTION_COEFF 1.25
+
 	void main(void) {
 		vec3 color = vec3(0.0);
 
-		for (float iter = 0.0; iter < max_iter; iter += 1.0)
+		// First
+		TraceData ray;
+		vec3 start = cameraPosition + vTextureCoord / f_val;
+		start.z = 0.0;
+		ray.pos = start;
+		ray.dir = normalize(focus * vTextureCoord - start);
+		ray.col = vec3(0.0);
+		ray.reflection = vec3(1.0);
+		//// Marching
+		ray = traceRay(ray, 0.0);
+		//// Get color
+		color += ray.col / max_iter * MULTI_PATH_RTX_BRIGHTNESS_CORRECTION_COEFF;
+		// Second and later
+		for (float iter = 1.0; iter < max_iter; iter += 1.0)
 		{
-			TraceData ray;
-			ray.pos = cameraPosition;
-			ray.dir = normalize(vTextureCoord);
+			start = cameraPosition + vTextureCoord / f_val + vec3(
+				BLUR_CIRCLE_RADIUS_COEFF / f_val * cos(M_PI * 2.0 * iter / max_iter),
+				BLUR_CIRCLE_RADIUS_COEFF / f_val * sin(M_PI * 2.0 * iter / max_iter),
+				0.0);
+			start.z = 0.0;
+			ray.pos = start;
+			ray.dir = normalize(focus * vTextureCoord - start);
 			ray.col = vec3(0.0);
 			ray.reflection = vec3(1.0);
 			// Marching
 			ray = traceRay(ray, iter);
 			// Get color
-			color += ray.col / max_iter;
+			color += ray.col / max_iter * MULTI_PATH_RTX_BRIGHTNESS_CORRECTION_COEFF;
 		}
 
 		fragmentColor = vec4(clamp(exposure * color, 0.0, 1.0), 1.0);
@@ -1475,6 +1505,8 @@ function glmain() {
 			}),
 			max_iter: gl.getUniformLocation(renderShaderProgram, 'max_iter'),
 			max_bound: gl.getUniformLocation(renderShaderProgram, 'max_bound'),
+			focus: gl.getUniformLocation(renderShaderProgram, 'focus'),
+			f_val: gl.getUniformLocation(renderShaderProgram, 'f_val'),
 		},
 	};
 
@@ -1625,7 +1657,13 @@ function drawScene(gl, renderProgramInfo, screenBuffers)
 	    gl_shapes.length);
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.max_iter,
-	    realistic_render ? 2.0 : 1.0);
+	    realistic_render ? maximum_iteration_number_in_realistic_render_mode : 1.0);
+	gl.uniform1f(
+	    renderProgramInfo.uniformLocations.focus,
+	    realistic_render ? ray_tracing_focus_distance : 1.0);
+	gl.uniform1f(
+	    renderProgramInfo.uniformLocations.f_val,
+	    ray_tracing_f);
 	for (let i = 0; i < gl_shapes.length; ++i) {
 		gl.uniform4iv(
 		    renderProgramInfo.uniformLocations.shapes[i].type,
