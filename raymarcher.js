@@ -1660,7 +1660,7 @@ function drawScene(gl, renderProgramInfo, screenBuffers)
 	    realistic_render ? maximum_iteration_number_in_realistic_render_mode : 1.0);
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.focus,
-	    realistic_render ? ray_tracing_focus_distance : 1.0);
+	    ray_tracing_focus_distance);
 	gl.uniform1f(
 	    renderProgramInfo.uniformLocations.f_val,
 	    ray_tracing_f);
